@@ -1,0 +1,2403 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<rfc xmlns:xi="http://www.w3.org/2001/XInclude" ipr="trust200902" docName="draft-sergeev-claim-boundaries-02" category="info" submissionType="IETF" tocInclude="true" sortRefs="true" symRefs="true" version="3">
+  
+  <front>
+    <title abbrev="Claim Boundaries">Claim Boundaries for Execution Evidence</title>
+    <seriesInfo name="Internet-Draft" value="draft-sergeev-claim-boundaries-02"/>
+    <author initials="M." surname="Sergeev" fullname="Mikhail Sergeev">
+      <organization>Independent Researcher</organization>
+      <address>
+        <email>mikhailsergeev369@gmail.com</email>
+      </address>
+    </author>
+    <date year="2026" month="October" day="15"/>
+    <keyword>evidence</keyword>
+    <keyword>claims</keyword>
+    <keyword>audit</keyword>
+    <keyword>attestation</keyword>
+    <keyword>agents</keyword>
+    <abstract>
+      
+
+<t>Systems that act in the world produce logs, receipts, approvals, traces,
+attestations, provenance statements, and transparency records. These
+artifacts are routinely offered as evidence that an action was
+authorized, performed, or completed. This document states a discipline
+for bounding such claims: the strength of an execution-related claim is
+limited by what the available evidence actually observed, constitutes,
+or proves, and by the control and observation topology at the boundary
+that produced it. Message formats, signature validity, receipt validity,
+and registration do not create observation or independence that did not
+exist. No message format can supply the independent enforcement or
+observation dependencies that a prevention or adversary-resistant
+detection-coverage guarantee requires. An appendix works through a
+scenario in which one party creates another and may be able to act in
+its name. The document defines no protocol, no record format, and no
+registry. It collects non-inference rules, a control-topology test for
+prevention and detection claims, a worked example, and reporting
+distinctions for evidence that does not support the claim asserted over
+it.</t>
+    </abstract>
+  </front>
+  <middle>
+    
+
+<section anchor="introduction">
+      <name>Introduction</name>
+      <t>An operator states that "the payment was executed". The artifact behind
+the statement is a signed log entry produced by the operator's own
+service. The signature verifies. The schema validates. The entry was
+registered with a transparency service. None of that establishes that
+the payment reached the payment network, only that the operator recorded
+and registered a well-formed statement saying so.</t>
+      <t>Gaps of this kind are routine wherever execution-related evidence is
+consumed: audit pipelines, compliance reporting, supply-chain
+attestation, and incident forensics. They appeared recently and sharply
+in the IETF's agent-protocol discussions of 2026 (<xref target="abc"/>), in protocols
+for AI agents, where one party's software performs actions whose records
+are produced largely by the acting side itself.</t>
+      <t>The failure mode is semantic and assurance inflation: the strength of a
+claim silently grows as an artifact moves between parties, formats, and
+summaries. A record of an invocation is cited as proof of execution. A
+valid signature is read as truth of the signed statement. The presence
+of an audit trail is read as completeness of coverage. An authorization
+is reported as an action performed. Each step feels small, but together
+they produce a claim that no producing boundary ever observed.</t>
+      <t>This document states the bounding discipline in one place, in
+protocol-neutral terms, so that specifications, deployments, and reviews
+can name the exact point at which a claim outruns its evidence.</t>
+      <section anchor="scope-and-non-goals">
+        <name>Scope and non-goals</name>
+        <t>This document is descriptive. It defines no wire format, no transport,
+no carrier, no record or receipt format, no authority or authorization
+mechanism, no registry, and no generic evidence protocol. It does not
+compete with, extend, or profile any of the systems discussed in
+<xref target="related"/>. It states analytic limits that hold whichever of those
+systems carries the evidence. Because it specifies no protocol behavior,
+it does not use BCP 14 requirement keywords: statements of the form "X
+does not establish Y" are claims about what an artifact can support, not
+conformance requirements.</t>
+        <t>This document states a claim-appraisal discipline, not an
+evidence-design discipline. It identifies when available evidence does
+or does not establish a claim, from the position of a relying party
+deciding what to conclude from what it has. It does not prescribe the
+complete set of observations, bindings, retention mechanisms, or
+architecture that would have to be put in place in advance so that a
+given claim remains determinable later. Enforcement or observation at
+the time of an action and determination at a later time are related, but
+they are not the same requirement. What further material should have
+been captured or bound at action time, where, and by whom, is related
+work and outside the scope of this document.</t>
+        <t>The discipline is not new in its parts. Bounded claim statements are
+already in use in specific domains: a time-stamp token is evidence that
+a datum existed before a particular time, and the authority time-stamps
+only a hash of the datum and does not examine it <xref target="RFC3161"/>; DomainKeys
+Identified Mail (DKIM) distinguishes the signing domain from the
+purported author and limits its integrity assertion to the content
+covered by the signature <xref target="RFC6376"/>; certificate transparency describes
+its logs as making misissuance detectable rather than preventing it
+<xref target="RFC9162"/>; supply-chain transparency describes itself as holding
+issuers accountable rather than preventing dishonest ones <xref target="RFC9943"/>.
+This document collects such statements as one discipline for
+execution-related evidence and claims no priority for any individual
+rule.</t>
+      </section>
+    </section>
+    <section anchor="terminology">
+      <name>Terminology</name>
+      <t>This document uses the following terms descriptively. It uses "claim",
+"evidence", and "relying party" in their general senses. In the Remote
+ATtestation procedureS (RATS) architecture <xref target="RFC9334"/>, Evidence and
+Attestation Results are distinct artifacts, and either can serve as
+evidence here. A RATS Claim is a piece of asserted information inside
+such an artifact, while a claim here is a statement offered for
+reliance. Where a RATS term is meant, it is capitalized.</t>
+      <dl>
+        <dt>Claim:</dt>
+        <dd>
+          <t>A statement offered for reliance, concerning an action: that it was
+intended, authorized, invoked, performed, completed, or had an effect.</t>
+        </dd>
+        <dt>Evidence:</dt>
+        <dd>
+          <t>Artifacts offered in support of a claim: records, logs, receipts,
+signatures, attestations, provenance statements, transparency entries,
+and similar.</t>
+        </dd>
+        <dt>Producing boundary:</dt>
+        <dd>
+          <t>The vantage point, component, or interface at which a piece of
+evidence was produced, together with what that vantage point could
+observe and who controls it. This document uses "producing boundary"
+throughout as its general term for that vantage point.</t>
+        </dd>
+        <dt>Interested party:</dt>
+        <dd>
+          <t>A party whose conduct the claim describes or whose incentives are
+served by the claim being accepted; typically the operator of the
+acting system.</t>
+        </dd>
+        <dt>Relying party:</dt>
+        <dd>
+          <t>A party deciding whether to accept the claim.</t>
+        </dd>
+        <dt>Control topology:</dt>
+        <dd>
+          <t>The arrangement of which parties control which enforcement points,
+observation points, keys, and delivery paths relevant to a claim.</t>
+        </dd>
+        <dt>Independence:</dt>
+        <dd>
+          <t>A property of deployment and control. A statement of independence
+names a component and its role: enforcement, observation, delivery, or
+evaluation. It can instead name a record or the grounds of a premise.
+It names a party or a coalition (parties acting together), a period,
+and a threat model. The named thing is independent of that party with
+respect to a capability if the party lacks that capability over it.
+<xref target="independence"/> names three capabilities: forgery, concealment, and
+circumvention. Which of them matter depends on the claim. Independence
+describes control. Whether the evidence supports the claim is a
+separate question (<xref target="principle"/>). A label, a field value, a distinct
+key, an organizational name, or a count of components does not by
+itself establish independence.</t>
+        </dd>
+      </dl>
+    </section>
+    <section anchor="principle">
+      <name>The bounding principle</name>
+      <t>The strength of an execution-related claim is bounded by:</t>
+      <ol spacing="normal" type="1"><li>
+          <t>what the available evidence actually observed, constitutes, or
+proves, at the boundary that produced it; and</t>
+        </li>
+        <li>
+          <t>the control and observation topology at that boundary: who operated
+it, who could bypass it, and through whose hands its output travels.</t>
+        </li>
+      </ol>
+      <t>Message format, signature validity, receipt validity, and registration
+do not raise either bound. A format can carry a statement about control
+or observation, but it cannot create control or observation that did not
+exist. A signature authenticates bytes under a key. By itself it
+establishes neither the truth of what the bytes assert nor the signer's
+control of the boundary they describe. A receipt's evidential force
+depends on the property being checked, the observations or proofs that
+support it, and the applicable trust and deployment assumptions.
+Successful verification of a registration receipt can support that a
+statement was registered under the service's policy. Registration alone
+does not establish that the event described in the statement occurred.</t>
+      <t>These limits concern what follows from the stated evidence and premises.
+They do not preclude an inference from complementary observations whose
+relationships and load-bearing assumptions are established.
+Cryptographic verification can support those assumptions. It does not
+supply a missing observation by authenticating a statement about it.</t>
+      <t>Support does not have to come from direct observation of the claimed
+action. <xref target="constructive"/> describes the other routes and their premises.</t>
+      <t>In this document, evidence supports a claim when the claim follows from
+the evidence under the stated premises. One practical test checks this.
+Try to describe two cases in which the relying party holds the same
+evidence under the same premises, but the claim is true in one case and
+false in the other. If both cases are possible under those premises, the
+evidence does not support the claim as stated. Failing to find such a
+pair does not prove that none exists. Evidence that only makes a claim
+more likely does not support the claim in this sense, although it can
+still support a weaker claim (<xref target="reporting"/>).</t>
+    </section>
+    <section anchor="bases">
+      <name>Evidence bases: what did the evidence observe?</name>
+      <t>Execution-related artifacts answer different questions, and the
+differences are load-bearing. At minimum, the following bases are worth
+distinguishing:</t>
+      <dl>
+        <dt>Observation:</dt>
+        <dd>
+          <t>Some event concerning the action was recorded or reported. Absence of
+a record alone is not an observation that an event did not occur.</t>
+        </dd>
+        <dt>Intent:</dt>
+        <dd>
+          <t>A specific intention, plan, approval, or decision concerning the exact
+action is evidenced. This establishes neither the validity of the
+approval nor anything about performance.</t>
+        </dd>
+        <dt>Invocation:</dt>
+        <dd>
+          <t>The exact request crossed an observed invocation boundary. This does
+not establish that the invoked operation executed or had an effect.</t>
+        </dd>
+        <dt>Execution:</dt>
+        <dd>
+          <t>Performance of the exact action was evidenced at a boundary in a
+position to observe execution. This does not establish completion of a
+larger process, a durable external effect, goal satisfaction,
+correctness, or policy compliance. <xref target="constructive"/> addresses claims
+about an effect, its persistence, and its finality.</t>
+        </dd>
+      </dl>
+      <t>The observation base asks only whether some event concerning the action
+was recorded or reported. Elsewhere in this document, an observation is
+an event seen at a boundary in a position to see it (Sections
+<xref target="principle" format="counter"/> and <xref target="constructive" format="counter"/>). Evidence at the observation base
+need not be an observation in that sense.</t>
+      <t>These bases are distinct questions about one action. They are not levels
+on one scale, and they need not be mutually exclusive. A conclusion from
+one base to another holds only under stated premises. Evidence relevant
+to one base does not, merely by being assigned to that base, satisfy the
+evidential criteria relied on for another. Distinctions of this kind,
+between stages of an action's lifecycle whose evidence does not carry
+across, are long established in distributed-systems practice (for
+example the separation of a remote procedure call's invocation from its
+execution and its result). One executable realization that binds exact
+predicates to these four bases appears in <xref target="I-D.sergeev-wexp-core"/>.
+This document does not depend on it.</t>
+      <t>Other distinctions cut across the bases. Verification reach (who can
+check a record) is orthogonal to claim strength: a
+third-party-verifiable invocation record is still invocation evidence.
+And asserted content differs from observed content: a mediator's record
+may faithfully report what the mediator asserts about a downstream
+outcome it never observed. A useful record says at which boundary it was
+produced and whether each statement in it was observed there or merely
+asserted there.</t>
+      <t>The action referred to by a claim should be identified at the relevant
+boundary. A business intention, an authorization, a request attempt, an
+execution, and a durable effect need not have a one-to-one relation.
+Retries, proxies, and idempotent processing can change those relations.
+A composite claim depends on evidence establishing the particular
+bindings it uses. This document prescribes no common identifier format.</t>
+    </section>
+    <section anchor="ceiling">
+      <name>The claim ceiling</name>
+      <t>In this document, a kind of claim is a family of claims to which the
+same type of evidence is relevant, such as the bases of <xref target="bases"/>. For a
+stated kind of claim, and under stated premises, a producing boundary
+limits the claims its evidence can support. Call that limit its claim
+ceiling. The term does not presume that all claims of one kind are
+comparable, or that one uniquely strongest claim exists.</t>
+      <t>A boundary in a position to observe invocations, but not execution,
+cannot by its observations warrant execution claims. That holds no
+matter how many well-formed execution assertions its records carry.</t>
+      <t>The underlying idea is old and this document claims no priority for it:
+a conclusion cannot be stronger than the vantage from which its
+supporting evidence was produced. <xref target="related"/> describes prior
+formulations.</t>
+      <t>A claim ceiling is an exclusion rule, not an evidence source. It can
+prevent a stronger claim from being supported, but it never creates
+support, so a supported claim still requires positive evidence at its
+own base.</t>
+      <t>A ceiling is also only as good as the grounding of the boundary
+description itself. A boundary descriptor asserted by the producer is
+only the producer's own account. <xref target="independence"/> describes what grounds
+a statement about who controls a boundary.</t>
+      <t>The accepted boundary description must apply to the time and deployment
+context of the claimed action. A later assessment or a current
+configuration does not, by itself, establish the earlier boundary's
+properties.</t>
+      <t>The same applies to any premise that would make the producer's records
+informative without observation. Where a claim rests on the producer's
+incentives or objectives being known, that knowledge is itself a premise
+requiring its own grounding. An alignment asserted by the producer is
+only the producer's own account.</t>
+      <t>This document defines independence in terms of control. Payment,
+contract, or ownership can give one party the means to direct another
+party's output or decision. They count here to the extent that they give
+that capability.</t>
+      <t>A record that requires no later cooperation from the party whose conduct
+is at issue is not, for that reason, independent of that party. A record
+it made at the time and left in place needs nothing from it afterwards
+and remains its own account of itself. The distinction between
+independence from cooperation and independence of the evidence itself
+follows an exchange with Douglas Wadkins; see
+<xref target="I-D.wadkins-agentproto-action-determinability"/>.</t>
+      <t>A claim ceiling is relative. It is stated for one kind of claim, at one
+observation boundary, with the support relation proper to that kind:
+which evidence supports which claim of that kind. Examples are the bases
+of <xref target="bases"/> and, separately, the prevention claims and the detection
+claims of <xref target="topology"/>.</t>
+      <t>Claims of different kinds are not ranked against one another by a
+ceiling. An execution claim and a detection claim are different kinds of
+claim, not points on one scale, and this document defines no scalar
+scale, level, or score on which all claims are ordered. "Stronger" and
+"weaker" in this document are always read within the kind of claim at
+issue.</t>
+    </section>
+    <section anchor="noninference">
+      <name>Non-inference rules</name>
+      <t>The following rules restate <xref target="principle"/> as individual limits. Each
+names an inference that is invalid without additional, separately
+established premises. None is original here; scoped versions of several
+appear in the documents cited in <xref target="related"/>.</t>
+      <t>Each rule is justified analytically. An example or a standards reference
+given with a rule is an illustration, and it is not presented as a
+documented incident. Claims about practical occurrence or consequences
+require their own support.</t>
+      <t>The list is not closed. A reader who finds a promotion these rules do
+not name has found a gap in this section, not a license for the
+promotion.</t>
+      <ol spacing="normal" type="1"><li>
+          <t>Successful signature verification does not by itself establish the
+truth of an event claim in the signed content. Establishing that
+correspondence requires grounds beyond signature validity.
+Separately, signature validity alone does not establish the signer's
+control of the boundary described by the claim. The same distinction
+is drawn for verifiable credentials, where verifiability of a
+credential does not imply the truth of the claims encoded in it
+<xref target="VC-DATA-MODEL"/>, and for signed Decentralized Identifier (DID)
+documents, where proofs in the document do not by themselves
+necessarily prove control over the DID <xref target="DID-CORE"/>.</t>
+        </li>
+        <li>
+          <t>Attribution of an actor is not proof that the attributed party performed the action. That a record is
+attributed to a party -- by a key, an identifier, or a credential
+associated with that party -- does not establish that the party
+performed the action, where another party can obtain, invoke, or
+emulate the attributed capability. Where one party creates or hosts
+another and can reach that other's signing or authenticating
+capability, an action attributed to the hosted party may have been
+performed by the host. Where a record reaches the relying party
+through intermediaries, attribution established at one step of that
+path does not carry to the next without that step's own basis. A
+transport can establish which component delivered a record. A source
+that the deliverer names inside the record is the deliverer's
+assertion, unless the record carries its own verifiable binding to
+that source.</t>
+        </li>
+        <li>
+          <t>A receipt, record, or registration is not external execution or
+effect. Registration establishes that a statement entered a log or
+service under that service's policy. Matching records held by
+different parties establish that their contents agree
+(correspondence), not that the parties agree. Correspondence does not
+establish which event preceded which (precedence), and it does not
+establish occurrence.</t>
+        </li>
+        <li>
+          <t>Presence of records is not completeness of coverage. A set of
+records, each individually authentic, does not establish that the set
+is all the records there are. Detecting omission requires more than
+the authenticity of each record: an independently grounded
+expectation of the complete population, which the set itself may
+carry, or a recording boundary that cannot be bypassed.</t>
+        </li>
+        <li>
+          <t>Absence of a record is not non-occurrence, unless the observation
+regime supports that inference. The inference from "no record" to "no
+event" is valid only where a declared, enforced recording boundary
+meets three conditions. It covers the event class. It cannot be
+bypassed by the parties in question. And gaps in the record stream
+are themselves detectable, for example against a pre-declared cadence
+or sequence carried in the records and watched by a party outside the
+producer. Otherwise absence is only absence.  </t>
+          <t>
+Such an inference also requires an identified interval, evidence that
+the required recording and delivery coverage held for that interval,
+and resolution of relevant delays and gaps. Detectability of a gap
+does not license a non-occurrence claim while the gap remains
+unresolved. The conclusion is limited to the specified event class,
+population, and interval under the stated assumptions.  </t>
+          <t>
+Bypass of the recording boundary is not the only way a record can
+fail to appear. A record may have been made and then withheld,
+whether by a retention policy that removed it or by a disclosure
+decision that did not produce it <xref target="AP-SCHROCK-RETENTION"/>. Where
+either is possible, the result is a statement about the evidence set
+examined and not about the recording boundary, and the conditions
+above are not met by the boundary alone.</t>
+        </li>
+        <li>
+          <t>Authority granted is not action performed. Authorization evidence,
+however exact, single-use, and attenuated, bounds what a grant
+permits at the point where it is enforced. It does not establish that
+the authorized action occurred. What is missing is evidence on the
+action's own basis: an observation of invocation or of execution, at
+a boundary in a position to make it, or a record that constitutes the
+action rather than describing it (<xref target="bases"/> and <xref target="constructive"/>).</t>
+        </li>
+        <li>
+          <t>Internal observation is not independent observation of an external
+effect. An observation made inside the acting party's boundary can
+establish, at most, what that boundary observed, and a record's
+statements about effects at other systems are assertions. In
+particular, a record minted by the deciding or authorizing side
+cannot by itself establish the order of its own decision against an
+effect that side does not observe. Other evidence carried in the same
+record is appraised under the routes and premises of
+<xref target="constructive"/>, regardless of its source.</t>
+        </li>
+        <li>
+          <t>Time and sequence evidence is bounded by the observation and control
+properties of its source, like any other evidence. A timestamp or
+sequence number is only as strong as the party and mechanism that
+produced it: one minted by the interested party over its own record
+orders that record, not the world. This is not a claim that time
+evidence is worthless. Trusted time-stamping has a distinct and
+stronger evidentiary role: a time-stamp token from an appropriately
+trusted authority is evidence that a datum existed before a
+particular time <xref target="RFC3161"/>. And a sequencing mechanism whose
+observational domain covers both of two events can order them. The
+rule is that the strength of the time or sequence claim follows the
+source, and must not be read past what that source observed and
+controlled.</t>
+        </li>
+        <li>
+          <t>A missing or unverifiable load-bearing premise cannot be silently
+promoted. Where support for a claim depends on a premise that was not
+evaluated, or that only the interested party can vouch for, the claim
+inherits that limitation. The report names the claims that are
+supported, and keeps the status of each premise that was not
+evaluated. A conditional claim states the premise it depends on
+(<xref target="reporting"/>).</t>
+        </li>
+        <li>
+          <t>Current authentication, when its verified scope is limited to a
+   present binding, does not by itself establish identity continuity or
+   succession relative to an earlier subject. Identity continuity,
+   succession, and the present applicability of prior authorization,
+   standing, or reputation are distinct claims. Each requires grounds
+   covering the specific relation or applicability asserted under the
+   relevant identity and authorization rules. A record's evidentiary
+   force depends on those rules and its verified properties, not merely
+   on its statement of the claim. DID Core states the corresponding
+   limit for persistent identifiers: absent published operational
+   policies, requesting parties are not expected to assume that an
+   identifier is persistent for the same subject <xref target="DID-CORE"/>.</t>
+        </li>
+        <li>
+          <t>Behavior observed under one set of conditions does not establish the
+   same behavior under other conditions without grounds for carrying the
+   conclusion across. A test, an audit, or a monitored run observes a
+   system under the conditions it applies. The result describes those
+   conditions. Carrying it to other conditions needs grounds that the
+   two do not differ in anything the behavior depends on. Where the
+   system can detect that it is being tested or observed, results
+   obtained under those conditions do not by themselves supply such
+   grounds, since the system can make its behavior depend on them.
+   <xref target="findings"/> reads the emissions case this way.</t>
+        </li>
+        <li>
+          <t>Multiplicity is not independence. A number of records, keys,
+   services, or organizational names does not by itself establish
+   independent support. Where one party has a capability that matters to
+   the claim over several of them, their number adds no independent assurance against
+   that party (<xref target="independence"/>). Independence is judged claim by claim,
+   for the components on whose correctness the support for that claim
+   relies.</t>
+        </li>
+        <li>
+          <t>Coherence is not corroboration. The detail, internal consistency,
+   plausibility, or fluency of an account produced by the interested
+   party does not by itself support the claim that what it describes
+   occurred. A fabricated account can have all of these properties, so
+   they do not distinguish a true claim from a false one (the test of
+   <xref target="principle"/>). This holds with particular force for accounts
+   generated by software, including language models, whose output can be
+   fluent whether or not it matches the events it describes. Support
+   needs grounds beyond these qualities, and evidence carried with the
+   account can provide them by one of the routes of <xref target="constructive"/>.</t>
+        </li>
+      </ol>
+      <t>Every rule here is stated against premises. The premises a conclusion
+rests on, their grounds, and their status should be available directly
+or by unambiguous reference. A premise accepted as a matter of policy is
+not thereby independently established. Where the premises change,
+whether the conclusion remains warranted has to be checked rather than
+assumed.</t>
+      <t>Aggregation, transformation, summarization, and re-signing remove none
+of these limitations. A pipeline that normalizes, merges, or re-encodes
+evidence inherits each relevant limitation of its inputs unless a
+specific limitation is specifically resolved by additional evidence. An
+unsupported widening of a claim at the output of such a pipeline is a
+defect to locate, not a result to report.</t>
+    </section>
+    <section anchor="lens">
+      <name>A claim-boundary review lens</name>
+      <t>The rules above can be applied as a short checklist when reviewing a
+specification, a deployment, or an evidence design. For a given claim,
+ask:</t>
+      <ol spacing="normal" type="1"><li>
+          <t>Exact claim. What exact claim, about what exact action, is being
+made?</t>
+        </li>
+        <li>
+          <t>Producing boundary. Which boundary produced the supporting evidence,
+and what could that boundary observe?</t>
+        </li>
+        <li>
+          <t>Control. Who controls that boundary? Can the interested party or
+coalition forge its output, conceal it, or circumvent it
+(<xref target="independence"/>)? Which of these capabilities matter to the claim
+being made? Did the limits on them hold for the period the claim
+depends on? What grounds those limits?</t>
+        </li>
+        <li>
+          <t>Ceiling. For the kind of claim at issue, what claim or claims can
+that boundary warrant? Does the asserted claim exceed them?</t>
+        </li>
+        <li>
+          <t>Positive evidence. Is there positive evidence at the claim's own
+base? A ceiling supplies no evidence, and a signature or a
+registration supports only the predicate that its verification
+establishes.</t>
+        </li>
+        <li>
+          <t>Prevention, detection coverage, or a particular finding. If the claim
+is that misbehavior is prevented, which independently controlled
+enforcement point does it rest on (<xref target="topology"/>)? If the claim is
+that misbehavior of a specified class cannot be concealed, which
+independently controlled observation and delivery dependencies does
+that coverage rest on? For a claim that a particular event was
+detected, which evaluation act (evaluator, predicate, evidence basis,
+window or context) is identified?</t>
+        </li>
+        <li>
+          <t>Basis for a claimed effect. Which route of <xref target="constructive"/> supports
+the claim? The routes described there include observation at a
+boundary outside the interested party's control, a record that
+constitutes the action, and evidence whose verification establishes a
+predicate. Where the support rests on another basis, is that basis
+stated? What limits its scope?</t>
+        </li>
+        <li>
+          <t>Completeness and absence. Does the claim depend on the record set
+being complete, or on an absence meaning non-occurrence? Is that
+supported (rules 4 and 5)? What interval and delivery horizon were
+evaluated, and were relevant gaps resolved?</t>
+        </li>
+        <li>
+          <t>Pipeline widening. Does any step between production and reliance
+widen the claim beyond what the producing boundary supported?</t>
+        </li>
+        <li>
+          <t>Reporting. Does the report separate whether each evaluation was made
+   from what it found (<xref target="reporting"/>)? Does it name the supported
+   claims, and the reason for any evaluation that was not made? Is
+   anything silently rounded up?</t>
+        </li>
+      </ol>
+      <t>The considerations sections of <xref target="RFC3552"/> (security) and <xref target="RFC6973"/>
+(privacy) are the models for this genre: a document states, in its own
+terms, what its mechanisms do and do not establish, and what residual
+exposure remains. This lens applies the same documentation discipline to
+the semantic strength of execution-related claims. It is a review aid,
+not a conformance procedure.</t>
+    </section>
+    <section anchor="topology">
+      <name>The control-topology test</name>
+      <t>Claims that an architecture prevents or detects misbehavior are
+execution-related claims about the architecture itself, and they are
+bounded the same way. Farrell's (a,b,c) scenario, described in <xref target="abc"/>,
+motivates the control-topology test used here. Stated
+mechanism-neutrally:</t>
+      <dl>
+        <dt>Prevention:</dt>
+        <dd>
+          <t>A claim that party B is prevented from performing or forging an action
+requires an enforcement point that B does not control and cannot
+bypass, positioned so that the action cannot complete without it. A
+component outside B's control that is not actually required for the
+action prevents nothing.</t>
+        </dd>
+        <dt>Detection coverage:</dt>
+        <dd>
+          <t>A claim that misbehavior in a specified class cannot be concealed by B
+requires the following.
+</t>
+          <dl>
+            <dt>Evidence:</dt>
+            <dd>
+              <t>adequate to distinguish that misbehavior under the stated
+assumptions.</t>
+            </dd>
+            <dt>Controls:</dt>
+            <dd>
+              <t>delivery or omission controls that prevent B from hiding it
+without an observable indication.</t>
+            </dd>
+          </dl>
+          <t>The claim should state its coverage, timing, and failure limits. These
+coverage conditions are distinct from establishing that a particular
+event was detected from evidence already obtained.</t>
+        </dd>
+        <dt>Independence:</dt>
+        <dd>
+          <t>The prevention and coverage properties above depend on independence in
+the sense of <xref target="independence"/>. The components concerned are the
+enforcement point, the observation point, and the delivery path. The
+party concerned is the stated party or coalition.</t>
+        </dd>
+      </dl>
+      <t>An architecture claiming prevention or adversary-resistant detection
+coverage should state:</t>
+      <ul spacing="normal">
+        <li>
+          <t>which independently controlled enforcement or observation dependencies
+the guarantee rests on;</t>
+        </li>
+        <li>
+          <t>what the relevant limits on forgery, concealment, and circumvention
+are (<xref target="independence"/>);</t>
+        </li>
+        <li>
+          <t>what happens when a dependency is unavailable or cannot be validated.</t>
+        </li>
+      </ul>
+      <t>Without those dependencies, that guarantee is not established against
+adversarial B, whatever its message formats carry. This does not
+invalidate a narrower finding supported by evidence that has actually
+been received and evaluated.</t>
+      <t>A protected observation path is not, by itself, sufficient for
+detection. The evidence must support a check that distinguishes the
+specified misconduct under the stated assumptions. An observable gap can
+establish a loss of coverage without establishing which underlying event
+occurred.</t>
+      <t>A claim that a particular event was detected requires an identifiable
+evaluation act. The record should name which evaluator evaluated, which
+predicate was checked and with what result, and on what evidence basis.
+Where a window or context applies, it should name that too.</t>
+      <t>Such a finding does not, by itself, establish that all events of that
+class were detectable or detected. A path that could have revealed an
+event does not show that anyone looked. This document defines no format
+for stating those items.</t>
+      <t>Certificate Transparency (CT) <xref target="RFC6962"/> <xref target="RFC9162"/> illustrates a limited omission control. Consider a TLS client whose policy requires valid Signed Certificate Timestamps (SCTs) from specified logs before accepting a certificate. Assume the client uses authentic log keys, validates the SCTs correctly, and the SCTs cannot be forged. If the issuing certification authority (CA) or stated coalition cannot change or bypass the client's enforcement of that policy, acceptance requires signed log promises bound to the certificate or its corresponding precertificate. For an issued certificate, the submitter need not be the CA. SCTs may be presented alongside the certificate.</t>
+      <t>Each SCT promises that the corresponding entry will be added to the log within the log's Maximum Merge Delay, measured from the SCT timestamp. It does not establish that the entry was added. Inclusion needs separate evidence, such as an inclusion proof verified against an authenticated signed tree head. Another route is to reconstruct the complete tree, verify that it contains the entry, and confirm that its root matches the root in that authenticated tree head. Inclusion does not establish consistency of all log views. A verified consistency proof establishes the append-only relationship between the specific authenticated tree states checked. Detecting conflicting views depends on comparing relevant observations. The gossip mechanism for that exchange is outside the scope of <xref target="RFC9162"/>.</t>
+      <t>A stronger claim that specified misbehavior cannot be concealed by the CA or coalition depends on the required independent controls over logs, observation, and evidence delivery (<xref target="independence"/>). The claim should state its coverage, timing, and failure limits. It should also state the relevant limits on forgery, concealment, and circumvention by the CA or coalition. Verifying an SCT does not establish these conditions. The acceptance control does not establish a complete record of certificate issuance. Certificates never presented on a path where the client enforces the policy are outside its scope. A claim that misissuance was detected from CT evidence requires an identifiable evaluation act using evidence adequate for the predicate being checked. Being able to obtain that evidence does not show that a monitor or other evaluator checked it or found misissuance.</t>
+      <t>Existing mechanisms slot into this test rather than exempting themselves
+from it. Remote attestation <xref target="RFC9334"/> contributes where all of the
+following hold:</t>
+      <ul spacing="normal">
+        <li>
+          <t>the Evidence covers the property at issue;</t>
+        </li>
+        <li>
+          <t>the adversarial party can neither forge nor substitute the Evidence or
+the Attestation Result, nor control the Verifier, its Appraisal Policy
+for Evidence, or the Endorsements and Reference Values it relies on;</t>
+        </li>
+        <li>
+          <t>the result is freshly and securely bound to the relevant actor and
+action.</t>
+        </li>
+      </ul>
+      <t>RFC 9334 permits its roles to be aggregated into one entity, so
+independence from a given party is a property of the deployment, not of
+the architecture.</t>
+      <t>Threshold signing <xref target="RFC9591"/> contributes a prevention dependency
+exactly where the adversarial party or coalition cannot reach the
+threshold without an independently controlled signer that checks the
+exact operation and can withhold its share. These mechanisms contribute
+only to the properties and dependencies actually established by their
+deployment.</t>
+      <t>OAuth sender-constraining mechanisms such as Demonstrating Proof of
+Possession (DPoP) <xref target="RFC9449"/> can limit the use of stolen tokens. They
+do not by themselves prevent B from invoking a key through a signing
+interface B controls. That holds whether the key was provisioned by
+another party or stored as non-exportable (<xref section="11.4" sectionFormat="of" target="RFC9449"/>).</t>
+      <t>An isolated execution environment, including a trusted execution
+environment (TEE), can contribute an enforcement dependency where B
+cannot modify or bypass the relevant checks. Claims about effects
+outside that environment still require an appropriate evidence basis.</t>
+      <t>The Workload Identity in a Multi System Environment (WIMSE) architecture
+<xref target="I-D.ietf-wimse-arch"/> separates workload authentication from
+authorization and permits different placements of policy enforcement.
+The test therefore asks who controls the deployed enforcement point and
+which operations it covers, rather than treating workload identity or
+credential provisioning as evidence that the claimed operation occurred.</t>
+      <t>The independently controlled point need not be cryptographic. A
+preserving repository may be audited and certified against a published
+standard <xref target="ISO16363"/>, by a body the repository does not control and
+which is itself accredited under a separate regime <xref target="CCSDS652-1"/>. That
+contributes a detection dependency if the audit observes the practice at
+issue and if any suppression of an adverse finding by the audited party
+would become visible.</t>
+      <t>That contribution is limited by the audit's scope, period, sampling,
+access, and reporting arrangements. Certification alone does not
+establish complete observation of all relevant conduct, nor the
+visibility of every suppressed adverse finding. The recursion terminates
+in an accreditation body that some party must be prepared to treat as
+terminal.</t>
+      <t>The test is indifferent to whether the point outside the party in
+question is a key, a verifier, or an accreditation regime. It asks only
+whether the deployment placed one there, and what that point actually
+covers.</t>
+      <section anchor="independence">
+        <name>Independence and the claim at issue</name>
+        <t>A statement of independence says which capabilities of the party matter
+to the claim at issue. It says what grounds the limit on each of them.
+This document does not say which grounds suffice to establish that such
+a limit holds.</t>
+        <t>The capabilities in question are these.</t>
+        <dl>
+          <dt>Forgery:</dt>
+          <dd>
+            <t>The party can make a relying party accept false evidence. One way is
+to fabricate the evidence, substitute or replay it, or alter it
+without detection. Another is to direct the component that produces
+the evidence, so that its output is false.</t>
+          </dd>
+          <dt>Concealment:</dt>
+          <dd>
+            <t>The party can act outside the recording boundary, so that the activity
+is not recorded there. It can also suppress, withhold, or delay
+evidence that exists.</t>
+          </dd>
+          <dt>Circumvention:</dt>
+          <dd>
+            <t>The party can complete the action without the enforcement point, or
+direct the decision of that point.</t>
+          </dd>
+        </dl>
+        <t>Where this document says "bypass", bypassing an enforcement point is
+circumvention and bypassing a recording boundary is concealment.</t>
+        <t>A claim needs limits only on the capabilities that matter to it. A
+capability matters to a claim if the party could use it to leave the
+relying party holding the same evidence while the claim is false. That
+is the test of <xref target="principle"/>, applied to what the party can do. Take a
+particular finding made from evidence already received. Forgery matters
+to it, and so does the binding of the evidence to the exact action
+(<xref target="constructive"/>). A payment network's record of transfer T can support
+that T occurred. This holds although the operator could have withheld
+the record or made other transfers elsewhere. Concealment matters to
+completeness and to detection coverage (rules 4 and 5). The same record
+does not support that these are all of the operator's transfers.
+Concealment can also matter to a particular finding, where omitted
+evidence would change the finding. Circumvention matters to prevention.
+The limits have to hold for the period the claim depends on. A present
+assessment does not by itself establish that the limits held earlier.</t>
+        <t>Independence does not make an observation relevant to the claim. An
+observer outside the operator's control that saw a command sent has not
+thereby seen it executed. A separate question remains: can the
+observation distinguish a true claim from a false one (<xref target="principle"/>)?</t>
+        <t>A dependency can enter where evidence is formed, where it is delivered,
+and where it is evaluated. An independent evaluator can verify the
+interested party's own account, but the account does not become an
+independent observation. Control over delivery gives the capability to
+conceal, and it can also permit substitution or replay, but it does not
+give control over the source. An independent component does not make a
+record presented as its output authentic: the operator can present a
+forged confirmation from an independent payment network. The relying
+party therefore checks origin, binding to the exact action, and any
+required freshness separately (<xref target="constructive"/>).</t>
+        <t>Two sources that take a fact from the same origin both depend on that
+origin for that fact. Two logs that each copy the operator's message are
+not two observations of execution (rule 3). Where one party has the
+relevant capability over several components, those components do not
+count separately against that party. Three services that act, record,
+and check, run by one operator who can change their code or their
+records, divide the work but not the control. The useful question is
+which error or fabrication the second source rules out. Independence
+from one party does not establish independence from a coalition that
+includes it.</t>
+        <t>A statement of independence is itself a claim, with a producing boundary
+and a ceiling. Its grounds can stop at a premise that a party accepts as
+a matter of policy. A claim that relies on the statement then stays
+conditional on that premise. The premise travels with that claim when it
+is passed on (Sections <xref target="noninference" format="counter"/> and <xref target="reporting" format="counter"/>). The audit
+example in <xref target="topology"/> shows one such premise. <xref target="constructive"/>
+describes evidence whose source need not be independent.</t>
+      </section>
+    </section>
+    <section anchor="constructive">
+      <name>When stronger claims become supportable</name>
+      <t>The discipline does not only rule claims out. Stronger claims about a
+particular effect become supportable when the effect is observed at a
+boundary capable of observing it. That capability is judged under the
+stated threat and control model. The evidence of that observation must
+also be protected against undetected fabrication or alteration by the
+interested party. Coverage claims additionally depend on the observation
+and delivery conditions described in <xref target="topology"/>.</t>
+      <t>An external footprint is one important route to such observation.
+Examples are movement on a payment rail, and resource or configuration
+records in an external provider's control plane. In each, a system the
+interested party does not control observed something at its own
+boundary, and a relying party can check that system's records against
+the claim.</t>
+      <t>It is not the only route. The observing boundary may be any of several
+things:</t>
+      <ul spacing="normal">
+        <li>
+          <t>an external service, a counterparty, or a settlement system;</t>
+        </li>
+        <li>
+          <t>an external control plane;</t>
+        </li>
+        <li>
+          <t>the relying party's own observation boundary, where the relying party
+itself observes the effect: a state change in a system it operates, or
+a delivery it takes receipt of itself;</t>
+        </li>
+        <li>
+          <t>another point that is in a position to observe the relevant fact and
+that the interested party does not control under the stated threat
+model.</t>
+        </li>
+      </ul>
+      <t>A distinct third party is not always necessary. The relying party's own
+observation may provide the required evidence, subject to the same
+claim-specific trust and deployment assumptions.</t>
+      <t>A further route relies on a record constituting the precise action
+claimed, rather than describing a separate action:</t>
+      <ul spacing="normal">
+        <li>
+          <t>a signed order that is the order;</t>
+        </li>
+        <li>
+          <t>a recorded state transition on a ledger that is the transfer;</t>
+        </li>
+        <li>
+          <t>a recorded command whose issuance is itself the claimed action;</t>
+        </li>
+        <li>
+          <t>a write-ahead entry that defines the commit.</t>
+        </li>
+      </ul>
+      <t>Such a record supports that precise claim, because issuing or accepting
+it constitutes the action under the applicable rules. The evidence must
+establish the conditions that give the record that constitutive effect,
+including any applicable authority, acceptance, and commit or finality
+conditions. A record on a branch that was never accepted does not
+constitute the action merely by resembling one that would.</t>
+      <t>What it supports is bounded by the action it constitutes and extends no
+further. A ledger entry that is the transfer establishes the transfer,
+not that goods moved. A signed order that is the order establishes the
+order, not that it was carried out. Where a record describes an action
+it does not constitute, this route does not apply.</t>
+      <t>Another route relies on evidence whose verification itself establishes a
+predicate. Examples are a proof of computation, a proof of possession,
+and a response to a fresh challenge. The source of such evidence does
+not need to be independent of the interested party. Successful
+verification establishes the proved predicate, under the premises of the
+verification. Those premises include the soundness of the proof system,
+the integrity of the verifier, and that the statement verified is the
+one the claim names. Where soundness bounds the probability of a false
+acceptance rather than excluding it, treating it as exact is an
+idealization, and a report that relies on it should say so. A claim that
+does not follow from that predicate needs its own evidentiary grounds
+and the bindings it requires. For a proof of computation, such claims
+can concern whether the committed inputs match the facts they stand for.
+They can concern who performed the computation, when a policy was
+applied, or whether an external effect followed. Signature verification
+is the familiar case: the proved predicate is that the bytes were signed
+under the key, and rule 1 applies to anything beyond it.</t>
+      <t>The qualifications below travel with these routes:</t>
+      <ul spacing="normal">
+        <li>
+          <t>The observing boundary supports claims at its own observation boundary
+and no further. A payment network's record establishes what the
+network observed about a transfer at its boundary, not that a business
+obligation was satisfied. A relying party's own observation
+establishes what the relying party observed at its boundary, and no
+more.</t>
+        </li>
+        <li>
+          <t>The observation, whether an external footprint or the relying party's
+own, must be bound to the exact action claimed. A matching amount,
+timestamp, or counterparty is correlation, and correlation supports
+weaker claims than a validated binding.</t>
+        </li>
+        <li>
+          <t>The protection afforded by the observing boundary is itself a
+threat-model statement. For a particular finding, the relevant
+protection is against the operator of the acting system fabricating or
+undetectably altering the evidence for the claimed observation.
+Against the operator of the observing boundary itself, the route gives
+no additional support. Where the relying party observes at its own
+boundary, the claim rests on the relying party's own observation,
+which is independent of the interested party but not of the relying
+party.</t>
+        </li>
+        <li>
+          <t>An effect is observed at a time. The observation does not, by itself,
+establish that the effect persisted or is final. A transfer can be
+reversed, a write can be rolled back, and a ledger branch can be
+abandoned. A claim of a durable or final effect needs evidence of the
+conditions that make it so. The rules of the system where the effect
+occurs set those conditions. That evidence needs one of the routes of
+this section.</t>
+        </li>
+        <li>
+          <t>Ordering claims, such as that the decision preceded the effect,
+require an ordering relation whose observational domain includes both
+terms. That means one boundary that observed both, or records from the
+two boundaries that can be securely related and ordered. Matching
+records alone establish neither the order of the records nor the order
+of the events.</t>
+        </li>
+        <li>
+          <t>The capability to conceal does not, by itself, invalidate evidence
+that has been received (<xref target="independence"/>). Subject to the
+qualifications above, the received evidence may support a particular
+finding within its observational and temporal scope. A finding that
+depends on the completeness of a specified evidence set, or on absence
+as evidence of non-occurrence, requires the corresponding coverage and
+gap-resolution basis (rules 4 and 5).</t>
+        </li>
+      </ul>
+    </section>
+    <section anchor="payment">
+      <name>Worked example: a payment</name>
+      <t>Consider an agent that reports having paid a supplier. Three evidence
+artifacts and a report combining them are on the table. The point of the
+example is that they support different claims, and that a report must
+keep separate what each boundary observed from what it merely asserts.</t>
+      <ol spacing="normal" type="1"><li>
+          <t>A self-produced execution record. The operator's own service emits a
+signed record: "paid supplier S, amount X, at time T". Observed at
+that boundary: that the operator's service produced and signed this
+statement. Asserted, not observed there: that the payment reached S.
+What it supports on its own: that the operator stated a payment; not
+that the payment occurred (rules 1, 3, 7).  </t>
+          <t>
+This example assumes that the record contains only the operator's own
+statement. If it carries independently verifiable evidence from
+another source, that evidence is appraised at its own producing
+boundary. The party assembling the container does not determine every
+item's origin.</t>
+        </li>
+        <li>
+          <t>A transparency registration. The signed record is registered with a
+transparency service, which returns a receipt carrying an inclusion
+proof. Observed: that this statement was registered under the
+service's policy. Any claim about registration time depends on the
+time evidence provided and its verified scope. What it does not
+establish: the truth of the statement or the occurrence of the
+payment (rule 3). Registration raises auditability, not the claim
+ceiling.</t>
+        </li>
+        <li>
+          <t>External payment-network evidence. A record from the payment network
+-- a settlement entry or network-issued confirmation -- that the
+network observed a transfer matching the action. Observed at a
+boundary outside the operator's control: that the network saw a
+transfer with these attributes. This is the footprint of
+<xref target="constructive"/>, and it must be bound to the exact action: a bare
+amount-and-time match is only correlation. Its strength holds against
+the operator, not against the payment network's own operator.</t>
+        </li>
+        <li>
+          <t>A composite report. A report that draws on all three should read, in
+substance, as three statements. The operator asserts a payment (1).
+The assertion is registered and independently checkable as an
+assertion (2). And where (3) is present and bound to the exact
+action, a system outside the operator observed a matching transfer at
+its boundary. That last supports a payment-reached-the-network claim,
+to the extent the binding holds and that evidence is protected
+against fabrication or undetected alteration by the operator. With
+only artifacts (1) and (2), the supportable claim is that the
+operator stated and registered a payment, not that a payment
+occurred.</t>
+        </li>
+      </ol>
+      <t>A report over these artifacts could read as follows. Evaluator V checked
+the origin of each artifact and the binding of the network record to the
+payment. V accepts one named premise: the network's record is reliable
+for the event it reports. Assume that the record reports that a transfer
+was seen, and says nothing about finality. V did not assess whether the
+set covers all of the operator's payments.</t>
+      <ul spacing="normal">
+        <li>
+          <t>A statement of the payment was signed under the operator's key.
+Evaluated. Supported: the signature verifies.</t>
+        </li>
+        <li>
+          <t>The statement was registered. Evaluated. Supported: the receipt
+verifies, within its scope.</t>
+        </li>
+        <li>
+          <t>The network observed a transfer bound to this payment. Evaluated.
+Supported: origin and binding were checked, under the named premise.</t>
+        </li>
+        <li>
+          <t>The payment to S is final. Evaluated. Unsupported by this set: the
+evidence evaluated does not establish the conditions for finality
+(<xref target="constructive"/>).</t>
+        </li>
+        <li>
+          <t>These are all of the operator's payments in the period. Not evaluated:
+completeness was not assessed (rule 4).</t>
+        </li>
+      </ul>
+      <t>Suppose instead that only the amount and the time match, and the binding
+is not established. The third entry is then unsupported for this
+payment. That the network saw some transfer remains supported.</t>
+      <t>The example makes no universal assertion about what any particular
+service observes. What a given payment service, transparency service, or
+agent runtime actually observed is a fact about that deployment, to be
+stated from its evidence, not assumed from its role.</t>
+    </section>
+    <section anchor="reporting">
+      <name>Reporting what the evidence supports</name>
+      <t>Where evidence does not support the claim asserted over it, the useful
+output is not a bare failure. For each claim, a report says whether the
+evaluation was made and, if it was, what it found. These are separate
+questions. An outcome-binding profile drew a related line earlier: its
+indeterminate state, used when required evidence is missing,
+unauthenticated, unpinned, or not exactly bound, is not a comparison
+outcome <xref target="I-D.schrock-ep-outcome-binding"/>.</t>
+      <t>Whether the evaluation was made:</t>
+      <dl>
+        <dt>Evaluated:</dt>
+        <dd>
+          <t>The relevant assessment ran over identified evidence, in an identified
+appraisal context.</t>
+        </dd>
+        <dt>Not evaluated:</dt>
+        <dd>
+          <t>The assessment did not run, the identified evidence could not be
+obtained, or the premise was outside the evaluation's scope. This
+status supplies no finding for or against the claim. It does not mean
+the claim is false, and it does not determine what the available
+evidence would support if evaluated. Nor is it permission to discard
+evidence that positively supports a claim at its own base. A claim
+well supported at its own base stays supported, even while another
+claim is not evaluated. It is also not a reason to repeat an action
+whose outcome is unknown, since the first attempt may have completed.
+That profile states the same limit for its indeterminate state
+<xref target="I-D.schrock-ep-outcome-binding"/>.
+</t>
+          <dl>
+            <dt>Unverifiable:</dt>
+            <dd>
+              <t>A reason for "not evaluated" that belongs to the evaluator. The
+statement is one that the evaluator in question cannot check from
+the evidence and inputs available to it at the time of evaluation.
+The standing example is a producer's description of its own
+deployment, which an evaluator may be unable to check without
+deployment access or other adequate evidence about that
+deployment. The category is relative to an evaluator and to an
+evidence or input set. Where they matter, it is relative to an
+evaluation context or time as well. A statement can pass from
+verifiable to unverifiable while the record itself is unchanged.
+The evaluator that could check it may cease to exist, or lose its
+access or the means to interpret what it holds. Such statements
+can still be worth carrying. The report names the reason and the
+premise that was not checked. Where a statement rests only on the
+producer's account, the report says so. A reader can then see
+which parts of a composite claim rest on trust. A report that
+fixes the category without fixing the evaluator and the moment
+says less than it appears to.</t>
+            </dd>
+          </dl>
+        </dd>
+      </dl>
+      <t>What the evaluation found:</t>
+      <dl>
+        <dt>Supported:</dt>
+        <dd>
+          <t>The evidence evaluated supports the claim as stated, under the stated
+premises.</t>
+        </dd>
+        <dt>Unsupported:</dt>
+        <dd>
+          <t>The assessment ran over the evidence evaluated, and that evidence
+failed it. This is a finding about the evaluated evidence, relative to
+the evidence set and the appraisal context in which it was evaluated.
+It is not a property of the world, and a different evidence set may
+support the claim. Where the assessment ran and the evidence evaluated
+lacks what the claim needs, the claim was evaluated and the finding is
+unsupported.</t>
+        </dd>
+        <dt>Refuted:</dt>
+        <dd>
+          <t>The evidence supports the negation of the claim. Absence of a record
+refutes a claim of occurrence only where rule 5 of <xref target="noninference"/>
+permits the inference from absence to non-occurrence. The report
+should state that finding and its basis explicitly, rather than
+treating it as mere absence of support.</t>
+        </dd>
+      </dl>
+      <t>One reporting practice applies to both questions:</t>
+      <dl>
+        <dt>Downgrade to the supportable claim:</dt>
+        <dd>
+          <t>Where the asserted claim is unsupported or not evaluated, report the
+strongest claim of the kind at issue that the evidence does support,
+or the supported claims where there is no unique strongest one,
+alongside the asserted claim, with its status and any finding. A claim
+supported at another base is a separate finding, not a downgrade;
+support at one base is not inferred from support at another
+(<xref target="bases"/>). "Invocation: supported. Execution: unsupported by the
+evidence evaluated" is actionable; "invalid" is not.</t>
+        </dd>
+      </dl>
+      <t>Collapsing "not evaluated" into "unsupported", or either into "refuted",
+destroys information a relying party needs: "we checked and it failed"
+and "we could not check" call for different decisions. These terms are
+not a result-code set. One report can say that a claim was not evaluated
+because a premise is unverifiable, and also identify a weaker claim that
+is supported.</t>
+      <t>A support assessment over the available evidence can complete while a
+required premise is not evaluated. The report identifies these
+assessments separately.</t>
+      <t>Each of these terms is relative to the evidence actually evaluated, and
+a report is more useful when it says what that evidence was. The
+evaluated set may itself be incomplete or selected. Every record in it
+can verify while records that would have changed the outcome were never
+delivered: rule 4 of <xref target="noninference"/>, met again at the reporting layer.</t>
+      <t>A verdict applies to the evidence basis it names, and a verdict that
+names no basis invites exactly the widening this document is about.</t>
+      <t>Appraisal results travel. One evaluator's result may be consumed by a
+later composite report: that a claim was not evaluated, for instance.
+The later relying party then needs to distinguish an attributable
+appraisal from an unattributed conclusion.</t>
+      <t>Propagated or aggregated appraisal results should therefore retain
+enough provenance to identify:</t>
+      <ul spacing="normal">
+        <li>
+          <t>who or what appraised;</t>
+        </li>
+        <li>
+          <t>the evidence or input basis, or a stable reference to it;</t>
+        </li>
+        <li>
+          <t>the predicate, profile, or evaluation context under which the result
+was reached, including the boundary at which the appraisal was made.</t>
+        </li>
+      </ul>
+      <t>Without that, "not evaluated" degrades across aggregation into
+somebody's unattributed conclusion. That is the aggregation limit of
+<xref target="noninference"/> arriving at the reporting layer. Where evaluated
+evidence or received appraisals support incompatible findings, the
+report identifies the conflict and any premise used to resolve it.</t>
+      <t>This is a consideration for reporting designs. It is not a record format
+and not a general retention requirement. The provenance of an appraisal
+identifies who is reported to have appraised what, under which context.
+By itself it establishes neither that the appraisal ran as reported nor
+that the underlying event occurred.</t>
+      <t>Consider a decision about whether a specified activity may continue.
+An accurate report of an authorization-status check does not by itself
+establish that the reported result was available to, or used by, the
+decision-maker. This remains so when the report states that no current
+answer was available. Admission of the continuation does not by itself
+establish that authorization was current. The applicable meaning of
+"current", including its reference time, is part of the appraisal context.</t>
+      <t>A claim about the basis of the decision needs grounds covering the
+relation between the exact decision, the continuation, the
+authorization-status input consulted for that decision, and the outcome
+of that consultation, including whether a current answer was returned.
+Merely identifying the consulted input does not establish the outcome
+of the consultation or that any returned result was used in making the
+decision. Whether admission is permitted when status is unknown is a
+separate policy question.</t>
+      <t>A reporting design that preserves these distinctions makes inflation
+visible: every summary that would erase one of them is a place where a
+stronger claim would otherwise silently replace a weaker one.</t>
+    </section>
+    <section anchor="applicability">
+      <name>Applicability beyond AI agents</name>
+      <t>Nothing in this discipline is stated in terms specific to AI agents. The
+same bounding questions apply to:</t>
+      <ul spacing="normal">
+        <li>
+          <t>audit logging and monitoring pipelines, where the questions are what
+the log source observed and who can write to it;</t>
+        </li>
+        <li>
+          <t>evidence collection and archiving practice <xref target="RFC3227"/>;</t>
+        </li>
+        <li>
+          <t>signed system logs <xref target="RFC5848"/>;</t>
+        </li>
+        <li>
+          <t>transparency systems (<xref target="RFC9162"/>, <xref target="RFC9943"/>);</t>
+        </li>
+        <li>
+          <t>long-term evidence records <xref target="RFC4998"/>;</t>
+        </li>
+        <li>
+          <t>compliance reporting and incident forensics;</t>
+        </li>
+        <li>
+          <t>operational telemetry, which is self-reported by instrumented code and
+designed for diagnosis rather than adjudication.</t>
+        </li>
+      </ul>
+      <t>Agent systems sharpened the problem. Actions are initiated by software
+whose records are produced mostly at the acting side, and delegation
+chains multiply the boundaries across which claims travel and inflate.
+But the rules in <xref target="noninference"/> are stated as properties of evidence
+rather than of agents.</t>
+      <t>One domain is worked here: the long-term preservation of records, where
+no agent acts and no payment is made. A preserving repository holds a
+record deposited by its creator. Fixity evidence can support a claim
+that deposited bytes have not changed relative to an accepted baseline.
+Identity and provenance evidence may support an authenticity assessment
+under stated assumptions. Archival diplomatics drew this distinction
+earlier and for a different substrate. It separates a record's
+reliability at the point of creation, the accuracy of its content, and
+its authenticity <xref target="INTERPARES"/> <xref target="DURANTI1998"/>. Neither finding, by
+itself, establishes that the record was reliable when created or that
+its content was accurate. Preservation does not convert custody
+integrity into truth of the original content. That is an instance of the
+claim ceiling of <xref target="ceiling"/>.</t>
+      <t>A gap in a deposited series supports no conclusion about what was never
+deposited, unless the deposit regime was declared, enforced, and
+observable to a party outside the depositor (rule 5). Whether a
+preserved record can still be evaluated depends on the record, the
+available representation and provenance information, and the evaluator's
+knowledge and access. This illustrates the evaluator- and time-relative
+unverifiability of <xref target="reporting"/>. The Open Archival Information System
+(OAIS) reference model addresses continued understandability for an
+identified Designated Community <xref target="ISO14721"/>.</t>
+      <t><xref target="findings"/> gives three public findings that state the same bounds
+outside agent systems. Applicability to the other domains listed above
+is asserted on the same grounds and is not worked case by case here.</t>
+    </section>
+    <section anchor="related">
+      <name>Related work</name>
+      <t>The following work provides existing mechanisms and domain-specific
+treatments relevant to these limits. This document collects selected
+implications for the appraisal of execution-related claims.</t>
+      <dl>
+        <dt>Non-bypassable mediation and tamper-evident logging:</dt>
+        <dd>
+          <t>Two older lineages give this discipline its positive content. In the
+reference-monitor lineage, a security-relevant decision is enforced
+only where every access is mediated by a mechanism the controlled
+party cannot bypass and cannot tamper with <xref target="ANDERSON72"/> -- the
+prevention half of <xref target="topology"/>. In the tamper-evident and
+transparency-logging lineage, alteration or equivocation in a record
+set can be made externally detectable <xref target="SCHNEIER-KELSEY"/> <xref target="RFC9162"/>
+-- the detection half. This document restates the boundary conditions
+those lineages already identified. It adds no mechanism, and claims
+none of them.</t>
+        </dd>
+        <dt>Attestation:</dt>
+        <dd>
+          <t>RFC 9334 <xref target="RFC9334"/> defines remote-attestation roles, appraisal
+flows, and trust assumptions, and the Entity Attestation Token (EAT)
+<xref target="RFC9711"/> provides an attested claims set. This document draws on
+those concerns to organize a review discipline for execution-related
+claims across artifact classes. It defines no remote-attestation
+machinery.</t>
+        </dd>
+        <dt>Transparency and receipts:</dt>
+        <dd>
+          <t>CBOR Object Signing and Encryption (COSE) Receipts <xref target="RFC9942"/> prove
+properties of a verifiable data structure, such as inclusion and
+consistency. Successful verification supports the specified
+data-structure predicate under the applicable cryptographic and trust
+assumptions. It does not, by itself, establish that an event described
+in a registered statement occurred. Supply Chain Integrity,
+Transparency, and Trust (SCITT) <xref target="RFC9943"/> applies transparency
+mechanisms to supply-chain statements and explicitly addresses the
+limits posed by dishonest issuers. Certificate transparency provides
+inclusion and consistency checks over log views <xref target="RFC9162"/>. A
+misbehaving log can nevertheless present inconsistent views to
+different clients. Detecting that behavior depends on comparing
+relevant observations, or on other mechanisms that address such split
+views. These are existing examples of bounded evidence claims.</t>
+        </dd>
+        <dt>Supply-chain step attribution:</dt>
+        <dd>
+          <t>in-toto <xref target="IN-TOTO"/> binds the artifacts flowing between the steps of a
+software supply chain, the order of the steps, and the identity of the
+party that signed for each, against a layout declared in advance by
+the project owner. Its analysis states the assumptions under which
+that binding holds, and how the guarantees degrade under key
+compromise. Both are boundary statements of the kind this document
+asks producers to make explicit.</t>
+        </dd>
+        <dt>Provenance:</dt>
+        <dd>
+          <t>PROV <xref target="PROV-DM"/> models provenance as asserted descriptions that feed
+trust assessment, not as verdicts.</t>
+        </dd>
+        <dt>Prior formulations by the author:</dt>
+        <dd>
+          <t>The four bases of <xref target="bases"/> and the ceiling of <xref target="ceiling"/> restate, in
+generic terms and without the level scale used there, content levels
+and the boundary axiom (Axiom BC) of earlier joint work with Vladimir
+Ikher <xref target="WITMODEL"/>. The Witnessability Conceptual Core states the
+generalization of that axiom as a derived rule <xref target="WCC-CORE"/>. The
+appraisal core of the Witnessed Execution Protocol (WEXP)
+<xref target="I-D.sergeev-wexp-core"/> gives an exclusion-only operational
+realization that binds exact predicates to the four bases. This
+document preserves that exclusion-only role. It makes no claim of
+independent discovery or priority, and its rules can be stated and
+applied without either work. The author's interest in WEXP is
+disclosed below.</t>
+        </dd>
+        <dt>Agent-protocol evidence work:</dt>
+        <dd>
+          <t>Individual Internet-Drafts address per-claim verifier, binding,
+freshness, and failure discipline
+<xref target="I-D.bu-agentproto-security-principal-binding"/>; enrollment and
+key-binding assumptions <xref target="I-D.yossif-enrollment-problem"/>; evidence of
+authorization decisions <xref target="I-D.bradleyb-audit-decision-records"/>; and
+an architecture for auditing agents' interactions and delegation
+<xref target="I-D.kuehlewind-audit-architecture"/>. Work on agent control delivery
+and outcome reconciliation
+<xref target="I-D.abak-agent-control-delivery-evidence"/> distinguishes issuer-side
+emission, required-target resolution, receiver-side observation,
+enforcement outcome, and observation of the resulting control effect.
+</t>
+          <t>An outcome-binding profile <xref target="I-D.schrock-ep-outcome-binding"/>
+separates the authorization of an action from its observed effect. It
+binds signed observations from executors, systems of record, and
+independent observers to the same authorization, action digest, and
+operation, with exact-equality checks on the action and source
+bindings, plus relying-party-defined observation-window requirements.
+It treats a declared control domain as relying-party policy input
+rather than proof of independence. And it returns an indeterminate
+state when required evidence is missing or unauthenticated.</t>
+          <t>A further draft <xref target="I-D.wadkins-agentproto-action-determinability"/>
+states mechanism-independent requirements for making a claimed agent
+transition independently determinable after the original interaction
+has ended. It addresses the binding of the material action and its
+governing conditions, a verification procedure that establishes that
+those conditions actually governed the transition when it occurred,
+determination without requiring cooperation from an original
+participant whose conduct or assertion is material to the facts
+determined, and negative, transferred, or incomplete transitions.</t>
+          <t>These works address related questions at specific boundaries. The
+discipline here can be applied to the claims made over their evidence.</t>
+        </dd>
+        <dt>Non-inference rules stated for a record format:</dt>
+        <dd>
+          <t>In the agent2agent discussion of a dimensional model for
+agent-protocol proposals, Blake Morrison set out rules for records
+carried under different extensions of one format
+<xref target="AP-MORRISON-RULES"/>. They are related limits on inference across
+records and extensions. They are proposals made on a mailing list, and
+they are cited as independent work, not as support for this document.</t>
+        </dd>
+        <dt>Authentication and admissibility in evidence law:</dt>
+        <dd>
+          <t>Comparable distinctions appear in rules of evidence. Under the United
+States Federal Rules of Evidence, electronic-process records and copies
+of electronic data may be self-authenticated when they satisfy the
+conditions of Rules 902(13) and 902(14), respectively <xref target="FRE902"/>.
+The specified certification addresses authentication; it does not by
+itself establish admissibility on other grounds or the reliability of
+the information reported. The burdens, admissibility rules, and remedies
+of evidence law remain outside this document's scope.</t>
+        </dd>
+        <dt>Assurance cases:</dt>
+        <dd>
+          <t>The claims-argument-evidence tradition provides structured
+argumentation over evidence. ISO/IEC/IEEE 15026-2 specifies
+requirements for assurance-case structure terminology <xref target="ISO15026-2"/>,
+and the Goal Structuring Notation community standard provides a
+notation for such arguments <xref target="GSN"/>. The presence of an assurance case
+or a graphical representation does not, by itself, establish that a
+particular evidential inference is justified.</t>
+        </dd>
+      </dl>
+    </section>
+    <section anchor="security">
+      <name>Security Considerations</name>
+      <t>This document specifies no new protocol mechanisms. Its subject is the
+prevention of a class of security failures that occur at the semantic
+layer: relying parties accepting claims stronger than the evidence
+supports.</t>
+      <t>Cautions about the discipline itself, including its misuse:</t>
+      <ul spacing="normal">
+        <li>
+          <t>The discipline does not make a dishonest or compromised evidence
+source honest. It bounds what a relying party should infer. It does
+not improve the evidence.</t>
+        </li>
+        <li>
+          <t>The discipline does not make an evaluator correct either. Every
+finding is conditional on the correctness of the evaluator and of the
+tools and inputs it relies on. That condition is a premise of every
+report, whether or not the report states it.</t>
+        </li>
+        <li>
+          <t>"Not evaluated" is not a license to discard evidence. A report that
+one claim was not evaluated, or is unsupported, is not a basis for
+setting aside evidence that positively supports another claim at its
+own base. The correct output is that supported claim, reported as such
+(<xref target="reporting"/>).</t>
+        </li>
+        <li>
+          <t>Deliberately unobservable topology is a limitation to report, not an
+exoneration. An interested party may arrange that its enforcement or
+observation points cannot be checked by anyone else. The report then
+says which evaluation failed or could not be made (<xref target="reporting"/>).
+Unobservability does not support the corresponding prevention or
+detection-coverage guarantee, and it is not evidence of good behavior.
+This does not extend to every case-level finding that received
+evidence may support.</t>
+        </li>
+        <li>
+          <t>Conformance vocabulary is itself inflatable. "Consistent with the
+claim-boundary discipline" is not a property a document or product can
+certify by assertion. The test is whether specific claims are bounded
+by specific producing boundaries, checked claim by claim.</t>
+        </li>
+        <li>
+          <t>Detection mechanisms can leak information. Making refusals, gaps, or
+suppression observable to an external party discloses timing and
+frequency information to that party. Deployments should weigh the
+observability required by <xref target="topology"/> against what the observation
+channel itself reveals; RFC 6973 <xref target="RFC6973"/> gives the model for
+stating that residual exposure.</t>
+        </li>
+      </ul>
+    </section>
+    <section anchor="iana-considerations">
+      <name>IANA Considerations</name>
+      <t>This document has no IANA actions.</t>
+    </section>
+  </middle>
+  <back>
+    <references anchor="sec-informative-references">
+      <name>Informative References</name>
+      <reference anchor="SCHNEIER-KELSEY" target="https://www.schneier.com/wp-content/uploads/2016/02/paper-auditlogs.pdf">
+        <front>
+          <title>Secure Audit Logs to Support Computer Forensics</title>
+          <author initials="B." surname="Schneier" fullname="Bruce Schneier">
+            <organization/>
+          </author>
+          <author initials="J." surname="Kelsey" fullname="John Kelsey">
+            <organization/>
+          </author>
+          <date year="1999" month="May"/>
+        </front>
+        <seriesInfo name="DOI" value="10.1145/317087.317089"/>
+        <refcontent>ACM Transactions on Information and System Security, Vol. 2, No. 2, pp. 159-176</refcontent>
+      </reference>
+      <reference anchor="EPA-VW-NOV" target="https://www.epa.gov/sites/default/files/2015-10/documents/vw-nov-caa-09-18-15.pdf">
+        <front>
+          <title>Notice of Violation</title>
+          <author>
+            <organization>United States Environmental Protection Agency</organization>
+          </author>
+          <date year="2015" month="September" day="18"/>
+        </front>
+        <refcontent>letter to Volkswagen AG, Audi AG, and Volkswagen Group of America, Inc.</refcontent>
+      </reference>
+      <reference anchor="AP-LIU-DPOP" target="https://mailarchive.ietf.org/arch/msg/agentproto/HdNkJZ48W0sg5JxK2gFkYkAK_Bs">
+        <front>
+          <title>Re: DRAFT minutes from the AGENTPROTO BoF</title>
+          <author initials="D." surname="Liu" fullname="Dapeng Liu">
+            <organization/>
+          </author>
+          <date year="2026" month="July" day="30"/>
+        </front>
+        <refcontent>message to the agentproto@ietf.org mailing list</refcontent>
+      </reference>
+      <reference anchor="ANDERSON72" target="https://csrc.nist.gov/files/pubs/conference/1998/10/08/proceedings-of-the-21st-nissc-1998/final/docs/early-cs-papers/ande72.pdf">
+        <front>
+          <title>Computer Security Technology Planning Study</title>
+          <author initials="J. P." surname="Anderson" fullname="James P. Anderson">
+            <organization/>
+          </author>
+          <date year="1972" month="October"/>
+        </front>
+        <refcontent>ESD-TR-73-51, Vol. II, HQ Electronic Systems Division (AFSC)</refcontent>
+      </reference>
+      <reference anchor="RFC3161">
+        <front>
+          <title>Internet X.509 Public Key Infrastructure Time-Stamp Protocol (TSP)</title>
+          <author fullname="C. Adams" initials="C." surname="Adams"/>
+          <author fullname="P. Cain" initials="P." surname="Cain"/>
+          <author fullname="D. Pinkas" initials="D." surname="Pinkas"/>
+          <author fullname="R. Zuccherato" initials="R." surname="Zuccherato"/>
+          <date month="August" year="2001"/>
+          <abstract>
+            <t>This document describes the format of a request sent to a Time Stamping Authority (TSA) and of the response that is returned. It also establishes several security-relevant requirements for TSA operation, with regards to processing requests to generate responses. [STANDARDS-TRACK]</t>
+          </abstract>
+        </front>
+        <seriesInfo name="RFC" value="3161"/>
+        <seriesInfo name="DOI" value="10.17487/RFC3161"/>
+      </reference>
+      <reference anchor="RFC3227">
+        <front>
+          <title>Guidelines for Evidence Collection and Archiving</title>
+          <author fullname="D. Brezinski" initials="D." surname="Brezinski"/>
+          <author fullname="T. Killalea" initials="T." surname="Killalea"/>
+          <date month="February" year="2002"/>
+          <abstract>
+            <t>A "security incident" as defined in the "Internet Security Glossary", RFC 2828, is a security-relevant system event in which the system's security policy is disobeyed or otherwise breached. The purpose of this document is to provide System Administrators with guidelines on the collection and archiving of evidence relevant to such a security incident. This document specifies an Internet Best Current Practices for the Internet Community, and requests discussion and suggestions for improvements.</t>
+          </abstract>
+        </front>
+        <seriesInfo name="BCP" value="55"/>
+        <seriesInfo name="RFC" value="3227"/>
+        <seriesInfo name="DOI" value="10.17487/RFC3227"/>
+      </reference>
+      <reference anchor="RFC3552">
+        <front>
+          <title>Guidelines for Writing RFC Text on Security Considerations</title>
+          <author fullname="E. Rescorla" initials="E." surname="Rescorla"/>
+          <author fullname="B. Korver" initials="B." surname="Korver"/>
+          <date month="July" year="2003"/>
+          <abstract>
+            <t>All RFCs are required to have a Security Considerations section. Historically, such sections have been relatively weak. This document provides guidelines to RFC authors on how to write a good Security Considerations section. This document specifies an Internet Best Current Practices for the Internet Community, and requests discussion and suggestions for improvements.</t>
+          </abstract>
+        </front>
+        <seriesInfo name="BCP" value="72"/>
+        <seriesInfo name="RFC" value="3552"/>
+        <seriesInfo name="DOI" value="10.17487/RFC3552"/>
+      </reference>
+      <reference anchor="RFC4998">
+        <front>
+          <title>Evidence Record Syntax (ERS)</title>
+          <author fullname="T. Gondrom" initials="T." surname="Gondrom"/>
+          <author fullname="R. Brandner" initials="R." surname="Brandner"/>
+          <author fullname="U. Pordesch" initials="U." surname="Pordesch"/>
+          <date month="August" year="2007"/>
+          <abstract>
+            <t>In many scenarios, users must be able prove the existence and integrity of data, including digitally signed data, in a common and reproducible way over a long and possibly undetermined period of time. This document specifies the syntax and processing of an Evidence Record, a structure designed to support long-term non-repudiation of existence of data. [STANDARDS-TRACK]</t>
+          </abstract>
+        </front>
+        <seriesInfo name="RFC" value="4998"/>
+        <seriesInfo name="DOI" value="10.17487/RFC4998"/>
+      </reference>
+      <reference anchor="RFC5848">
+        <front>
+          <title>Signed Syslog Messages</title>
+          <author fullname="J. Kelsey" initials="J." surname="Kelsey"/>
+          <author fullname="J. Callas" initials="J." surname="Callas"/>
+          <author fullname="A. Clemm" initials="A." surname="Clemm"/>
+          <date month="May" year="2010"/>
+          <abstract>
+            <t>This document describes a mechanism to add origin authentication, message integrity, replay resistance, message sequencing, and detection of missing messages to the transmitted syslog messages. This specification is intended to be used in conjunction with the work defined in RFC 5424, "The Syslog Protocol". [STANDARDS-TRACK]</t>
+          </abstract>
+        </front>
+        <seriesInfo name="RFC" value="5848"/>
+        <seriesInfo name="DOI" value="10.17487/RFC5848"/>
+      </reference>
+      <reference anchor="RFC6376">
+        <front>
+          <title>DomainKeys Identified Mail (DKIM) Signatures</title>
+          <author fullname="D. Crocker" initials="D." role="editor" surname="Crocker"/>
+          <author fullname="T. Hansen" initials="T." role="editor" surname="Hansen"/>
+          <author fullname="M. Kucherawy" initials="M." role="editor" surname="Kucherawy"/>
+          <date month="September" year="2011"/>
+          <abstract>
+            <t>DomainKeys Identified Mail (DKIM) permits a person, role, or organization that owns the signing domain to claim some responsibility for a message by associating the domain with the message. This can be an author's organization, an operational relay, or one of their agents. DKIM separates the question of the identity of the Signer of the message from the purported author of the message. Assertion of responsibility is validated through a cryptographic signature and by querying the Signer's domain directly to retrieve the appropriate public key. Message transit from author to recipient is through relays that typically make no substantive change to the message content and thus preserve the DKIM signature.</t>
+            <t>This memo obsoletes RFC 4871 and RFC 5672. [STANDARDS-TRACK]</t>
+          </abstract>
+        </front>
+        <seriesInfo name="STD" value="76"/>
+        <seriesInfo name="RFC" value="6376"/>
+        <seriesInfo name="DOI" value="10.17487/RFC6376"/>
+      </reference>
+      <reference anchor="RFC6962" target="https://www.rfc-editor.org/rfc/rfc6962">
+        <front>
+          <title>Certificate Transparency</title>
+          <author fullname="Ben Laurie" initials="B." surname="Laurie"/>
+          <author fullname="Adam Langley" initials="A." surname="Langley"/>
+          <author fullname="Emilia Kasper" initials="E." surname="Kasper"/>
+          <date month="June" year="2013"/>
+        </front>
+        <seriesInfo name="RFC" value="6962"/>
+        <seriesInfo name="DOI" value="10.17487/RFC6962"/>
+      </reference>
+      <reference anchor="RFC6973">
+        <front>
+          <title>Privacy Considerations for Internet Protocols</title>
+          <author fullname="A. Cooper" initials="A." surname="Cooper"/>
+          <author fullname="H. Tschofenig" initials="H." surname="Tschofenig"/>
+          <author fullname="B. Aboba" initials="B." surname="Aboba"/>
+          <author fullname="J. Peterson" initials="J." surname="Peterson"/>
+          <author fullname="J. Morris" initials="J." surname="Morris"/>
+          <author fullname="M. Hansen" initials="M." surname="Hansen"/>
+          <author fullname="R. Smith" initials="R." surname="Smith"/>
+          <date month="July" year="2013"/>
+          <abstract>
+            <t>This document offers guidance for developing privacy considerations for inclusion in protocol specifications. It aims to make designers, implementers, and users of Internet protocols aware of privacy-related design choices. It suggests that whether any individual RFC warrants a specific privacy considerations section will depend on the document's content.</t>
+          </abstract>
+        </front>
+        <seriesInfo name="RFC" value="6973"/>
+        <seriesInfo name="DOI" value="10.17487/RFC6973"/>
+      </reference>
+      <reference anchor="RFC9162">
+        <front>
+          <title>Certificate Transparency Version 2.0</title>
+          <author fullname="B. Laurie" initials="B." surname="Laurie"/>
+          <author fullname="E. Messeri" initials="E." surname="Messeri"/>
+          <author fullname="R. Stradling" initials="R." surname="Stradling"/>
+          <date month="December" year="2021"/>
+          <abstract>
+            <t>This document describes version 2.0 of the Certificate Transparency (CT) protocol for publicly logging the existence of Transport Layer Security (TLS) server certificates as they are issued or observed, in a manner that allows anyone to audit certification authority (CA) activity and notice the issuance of suspect certificates as well as to audit the certificate logs themselves. The intent is that eventually clients would refuse to honor certificates that do not appear in a log, effectively forcing CAs to add all issued certificates to the logs.</t>
+            <t>This document obsoletes RFC 6962. It also specifies a new TLS extension that is used to send various CT log artifacts.</t>
+            <t>Logs are network services that implement the protocol operations for submissions and queries that are defined in this document.</t>
+          </abstract>
+        </front>
+        <seriesInfo name="RFC" value="9162"/>
+        <seriesInfo name="DOI" value="10.17487/RFC9162"/>
+      </reference>
+      <reference anchor="RFC9334">
+        <front>
+          <title>Remote ATtestation procedureS (RATS) Architecture</title>
+          <author fullname="H. Birkholz" initials="H." surname="Birkholz"/>
+          <author fullname="D. Thaler" initials="D." surname="Thaler"/>
+          <author fullname="M. Richardson" initials="M." surname="Richardson"/>
+          <author fullname="N. Smith" initials="N." surname="Smith"/>
+          <author fullname="W. Pan" initials="W." surname="Pan"/>
+          <date month="January" year="2023"/>
+          <abstract>
+            <t>In network protocol exchanges, it is often useful for one end of a communication to know whether the other end is in an intended operating state. This document provides an architectural overview of the entities involved that make such tests possible through the process of generating, conveying, and evaluating evidentiary Claims. It provides a model that is neutral toward processor architectures, the content of Claims, and protocols.</t>
+          </abstract>
+        </front>
+        <seriesInfo name="RFC" value="9334"/>
+        <seriesInfo name="DOI" value="10.17487/RFC9334"/>
+      </reference>
+      <reference anchor="RFC9449">
+        <front>
+          <title>OAuth 2.0 Demonstrating Proof of Possession (DPoP)</title>
+          <author fullname="D. Fett" initials="D." surname="Fett"/>
+          <author fullname="B. Campbell" initials="B." surname="Campbell"/>
+          <author fullname="J. Bradley" initials="J." surname="Bradley"/>
+          <author fullname="T. Lodderstedt" initials="T." surname="Lodderstedt"/>
+          <author fullname="M. Jones" initials="M." surname="Jones"/>
+          <author fullname="D. Waite" initials="D." surname="Waite"/>
+          <date month="September" year="2023"/>
+          <abstract>
+            <t>This document describes a mechanism for sender-constraining OAuth 2.0 tokens via a proof-of-possession mechanism on the application level. This mechanism allows for the detection of replay attacks with access and refresh tokens.</t>
+          </abstract>
+        </front>
+        <seriesInfo name="RFC" value="9449"/>
+        <seriesInfo name="DOI" value="10.17487/RFC9449"/>
+      </reference>
+      <reference anchor="RFC9591">
+        <front>
+          <title>The Flexible Round-Optimized Schnorr Threshold (FROST) Protocol for Two-Round Schnorr Signatures</title>
+          <author fullname="D. Connolly" initials="D." surname="Connolly"/>
+          <author fullname="C. Komlo" initials="C." surname="Komlo"/>
+          <author fullname="I. Goldberg" initials="I." surname="Goldberg"/>
+          <author fullname="C. A. Wood" initials="C. A." surname="Wood"/>
+          <date month="June" year="2024"/>
+          <abstract>
+            <t>This document specifies the Flexible Round-Optimized Schnorr Threshold (FROST) signing protocol. FROST signatures can be issued after a threshold number of entities cooperate to compute a signature, allowing for improved distribution of trust and redundancy with respect to a secret key. FROST depends only on a prime-order group and cryptographic hash function. This document specifies a number of ciphersuites to instantiate FROST using different prime-order groups and hash functions. This document is a product of the Crypto Forum Research Group (CFRG) in the IRTF.</t>
+          </abstract>
+        </front>
+        <seriesInfo name="RFC" value="9591"/>
+        <seriesInfo name="DOI" value="10.17487/RFC9591"/>
+      </reference>
+      <reference anchor="RFC9711">
+        <front>
+          <title>The Entity Attestation Token (EAT)</title>
+          <author fullname="L. Lundblade" initials="L." surname="Lundblade"/>
+          <author fullname="G. Mandyam" initials="G." surname="Mandyam"/>
+          <author fullname="J. O'Donoghue" initials="J." surname="O'Donoghue"/>
+          <author fullname="C. Wallace" initials="C." surname="Wallace"/>
+          <date month="April" year="2025"/>
+          <abstract>
+            <t>An Entity Attestation Token (EAT) provides an attested claims set that describes the state and characteristics of an entity, a device such as a smartphone, an Internet of Things (IoT) device, network equipment, or such. This claims set is used by a relying party, server, or service to determine the type and degree of trust placed in the entity.</t>
+            <t>An EAT is either a CBOR Web Token (CWT) or a JSON Web Token (JWT) with attestation-oriented claims.</t>
+          </abstract>
+        </front>
+        <seriesInfo name="RFC" value="9711"/>
+        <seriesInfo name="DOI" value="10.17487/RFC9711"/>
+      </reference>
+      <reference anchor="RFC9942">
+        <front>
+          <title>CBOR Object Signing and Encryption (COSE) Receipts</title>
+          <author fullname="O. Steele" initials="O." surname="Steele"/>
+          <author fullname="H. Birkholz" initials="H." surname="Birkholz"/>
+          <author fullname="A. Delignat-Lavaud" initials="A." surname="Delignat-Lavaud"/>
+          <author fullname="C. Fournet" initials="C." surname="Fournet"/>
+          <date month="June" year="2026"/>
+          <abstract>
+            <t>CBOR Object Signing and Encryption (COSE) Receipts prove properties of a Verifiable Data Structure (VDS) to a verifier. VDSs and associated Proof Types enable security properties, such as minimal disclosure, transparency, and non-equivocation. Transparency helps maintain trust over time and has been applied to certificates, end-to-end encrypted messaging systems, and supply chain security. This specification enables concise transparency-oriented systems by building on Concise Binary Object Representation (CBOR) and COSE. The extensibility of the approach is demonstrated by providing CBOR encodings for Merkle inclusion and consistency proofs.</t>
+          </abstract>
+        </front>
+        <seriesInfo name="RFC" value="9942"/>
+        <seriesInfo name="DOI" value="10.17487/RFC9942"/>
+      </reference>
+      <reference anchor="RFC9943">
+        <front>
+          <title>An Architecture for Trustworthy and Transparent Digital Supply Chains</title>
+          <author fullname="H. Birkholz" initials="H." surname="Birkholz"/>
+          <author fullname="A. Delignat-Lavaud" initials="A." surname="Delignat-Lavaud"/>
+          <author fullname="C. Fournet" initials="C." surname="Fournet"/>
+          <author fullname="Y. Deshpande" initials="Y." surname="Deshpande"/>
+          <author fullname="S. Lasker" initials="S." surname="Lasker"/>
+          <date month="June" year="2026"/>
+          <abstract>
+            <t>Traceability in supply chains is a growing security concern. While Verifiable Data Structures (VDSs) have addressed specific issues, such as equivocation over digital certificates, they lack a universal architecture for all supply chains. This document defines such an architecture for single-issuer signed statement transparency. It ensures extensibility and interoperability between different transparency services as well as compliance with various auditing procedures and regulatory requirements.</t>
+          </abstract>
+        </front>
+        <seriesInfo name="RFC" value="9943"/>
+        <seriesInfo name="DOI" value="10.17487/RFC9943"/>
+      </reference>
+      <reference anchor="I-D.sergeev-wexp-core" target="https://datatracker.ietf.org/doc/html/draft-sergeev-wexp-core-01">
+        <front>
+          <title>The Witnessed Execution Protocol (WEXP): Core Specification</title>
+          <author initials="M." surname="Sergeev" fullname="Mikhail Sergeev">
+            <organization/>
+          </author>
+          <author initials="V." surname="Ikher" fullname="Vladimir Ikher">
+            <organization/>
+          </author>
+          <date year="2026" month="August" day="16"/>
+        </front>
+        <seriesInfo name="Internet-Draft" value="draft-sergeev-wexp-core-01"/>
+      </reference>
+      <reference anchor="I-D.bu-agentproto-security-principal-binding" target="https://datatracker.ietf.org/doc/html/draft-bu-agentproto-security-principal-binding-08">
+        <front>
+          <title>Security Principal and Verifier Binding for Agent Communication Protocols</title>
+          <author initials="S." surname="Bu" fullname="Songbo Bu">
+            <organization/>
+          </author>
+          <date year="2026" month="October" day="14"/>
+        </front>
+        <seriesInfo name="Internet-Draft" value="draft-bu-agentproto-security-principal-binding-08"/>
+      </reference>
+      <reference anchor="I-D.kuehlewind-audit-architecture" target="https://datatracker.ietf.org/doc/html/draft-kuehlewind-audit-architecture-01">
+        <front>
+          <title>An Architecture for Auditing Agent Delegation and Interactions</title>
+          <author initials="M." surname="Kuehlewind" fullname="Mirja Kuehlewind">
+            <organization/>
+          </author>
+          <author initials="H." surname="Birkholz" fullname="Henk Birkholz">
+            <organization/>
+          </author>
+          <date year="2026" month="September" day="07"/>
+        </front>
+        <seriesInfo name="Internet-Draft" value="draft-kuehlewind-audit-architecture-01"/>
+      </reference>
+      <reference anchor="I-D.bradleyb-audit-decision-records" target="https://datatracker.ietf.org/doc/html/draft-bradleyb-audit-decision-records-00">
+        <front>
+          <title>Signed Decision Records for Agent Authorization: Disclosures, Entry Emission, and Ordering Evidence</title>
+          <author initials="B." surname="B" fullname="Bradley B">
+            <organization/>
+          </author>
+          <date year="2026" month="August" day="13"/>
+        </front>
+        <seriesInfo name="Internet-Draft" value="draft-bradleyb-audit-decision-records-00"/>
+      </reference>
+      <reference anchor="I-D.yossif-enrollment-problem" target="https://datatracker.ietf.org/doc/html/draft-yossif-enrollment-problem-00">
+        <front>
+          <title>Problem Statement: Enrollment and Key-Binding Assumptions in Execution Authority Evidence</title>
+          <author initials="M. K." surname="Yossif" fullname="Mohamad Khalil Yossif">
+            <organization/>
+          </author>
+          <date year="2026" month="July" day="22"/>
+        </front>
+        <seriesInfo name="Internet-Draft" value="draft-yossif-enrollment-problem-00"/>
+      </reference>
+      <reference anchor="I-D.schrock-ep-outcome-binding" target="https://datatracker.ietf.org/doc/html/draft-schrock-ep-outcome-binding-00">
+        <front>
+          <title>Outcome Binding for Authorized Actions and Independently Observed Effects</title>
+          <author initials="I." surname="Schrock" fullname="Iman Schrock">
+            <organization/>
+          </author>
+          <date year="2026" month="July" day="28"/>
+        </front>
+        <seriesInfo name="Internet-Draft" value="draft-schrock-ep-outcome-binding-00"/>
+      </reference>
+      <reference anchor="I-D.ietf-wimse-arch" target="https://www.ietf.org/archive/id/draft-ietf-wimse-arch-08.html">
+        <front>
+          <title>Workload Identity in a Multi System Environment (WIMSE) Architecture</title>
+          <author initials="J." surname="Salowey" fullname="Joseph Salowey">
+            <organization/>
+          </author>
+          <author initials="Y." surname="Rosomakho" fullname="Yaroslav Rosomakho">
+            <organization/>
+          </author>
+          <author initials="H." surname="Tschofenig" fullname="Hannes Tschofenig">
+            <organization/>
+          </author>
+          <date year="2026" month="July" day="06"/>
+        </front>
+        <seriesInfo name="Internet-Draft" value="draft-ietf-wimse-arch-08"/>
+      </reference>
+      <reference anchor="I-D.wadkins-agentproto-action-determinability" target="https://datatracker.ietf.org/doc/draft-wadkins-agentproto-action-determinability/">
+        <front>
+          <title>Independent Determinability of Agent Actions</title>
+          <author initials="D. L." surname="Wadkins" fullname="Douglas Wadkins">
+            <organization>Strakewright</organization>
+          </author>
+          <date year="2026" month="September" day="10"/>
+        </front>
+        <seriesInfo name="Internet-Draft" value="draft-wadkins-agentproto-action-determinability-00"/>
+      </reference>
+      <reference anchor="I-D.abak-agent-control-delivery-evidence" target="https://www.ietf.org/archive/id/draft-abak-agent-control-delivery-evidence-02.html">
+        <front>
+          <title>Evidence Requirements for Agent Control Delivery and Outcome Reconciliation</title>
+          <author initials="A. T." surname="Abak" fullname="Ali Toygar Abak">
+            <organization/>
+          </author>
+          <date year="2026" month="October" day="11"/>
+        </front>
+        <seriesInfo name="Internet-Draft" value="draft-abak-agent-control-delivery-evidence-02"/>
+      </reference>
+      <reference anchor="I-D.fengfar-led" target="https://www.ietf.org/archive/id/draft-fengfar-led-01.html">
+        <front>
+          <title>Dealing with LLMs in IETF Discussions</title>
+          <author initials="S." surname="Farrell" fullname="Stephen Farrell">
+            <organization/>
+          </author>
+          <author initials="C." surname="Feng" fullname="Chong Feng">
+            <organization/>
+          </author>
+          <date year="2026" month="August" day="06"/>
+        </front>
+        <seriesInfo name="Internet-Draft" value="draft-fengfar-led-01"/>
+      </reference>
+      <reference anchor="AP-FARRELL-ABC" target="https://mailarchive.ietf.org/arch/msg/agentproto/wrQqZW9Dh3Yj6N7gV9RcfN5R8Kk">
+        <front>
+          <title>Re: DRAFT minutes from the AGENTPROTO BoF</title>
+          <author initials="S." surname="Farrell" fullname="Stephen Farrell">
+            <organization/>
+          </author>
+          <date year="2026" month="July" day="29"/>
+        </front>
+        <refcontent>message to the agentproto@ietf.org mailing list</refcontent>
+      </reference>
+      <reference anchor="AP-SERGEEV-GATE" target="https://mailarchive.ietf.org/arch/msg/agentproto/ORdiqDGi8Fno6ROXHmSljQFmEOY/">
+        <front>
+          <title>Re: DRAFT minutes from the AGENTPROTO BoF</title>
+          <author initials="M." surname="Sergeev" fullname="Mikhail Sergeev">
+            <organization/>
+          </author>
+          <date year="2026" month="July" day="30"/>
+        </front>
+        <refcontent>message to the agentproto@ietf.org mailing list</refcontent>
+      </reference>
+      <reference anchor="AP-ECKEL" target="https://mailarchive.ietf.org/arch/msg/agentproto/dZgLXO2xr3tr8pF0yejOZhj49-0">
+        <front>
+          <title>Re: DRAFT minutes from the AGENTPROTO BoF</title>
+          <author initials="C." surname="Eckel" fullname="Charles Eckel">
+            <organization/>
+          </author>
+          <date year="2026" month="July" day="30"/>
+        </front>
+        <refcontent>message to the agentproto@ietf.org mailing list</refcontent>
+      </reference>
+      <reference anchor="AP-FARRELL-CHEAT" target="https://mailarchive.ietf.org/arch/msg/agentproto/zDQjiJvUhMiv5EX2Jpgbdacs3eo">
+        <front>
+          <title>Re: DRAFT minutes from the AGENTPROTO BoF</title>
+          <author initials="S." surname="Farrell" fullname="Stephen Farrell">
+            <organization/>
+          </author>
+          <date year="2026" month="July" day="30"/>
+        </front>
+        <refcontent>message to the agentproto@ietf.org mailing list</refcontent>
+      </reference>
+      <reference anchor="AP-SAMMARTANO" target="https://mailarchive.ietf.org/arch/msg/agentproto/ike9opEcHLoS6QDdkJ0SKzSA96Y">
+        <front>
+          <title>Re: DRAFT minutes from the AGENTPROTO BoF</title>
+          <author initials="S." surname="Sammartano" fullname="Shawn Sammartano">
+            <organization/>
+          </author>
+          <date year="2026" month="July" day="30"/>
+        </front>
+        <refcontent>message to the agentproto@ietf.org mailing list</refcontent>
+      </reference>
+      <reference anchor="AP-SAMMARTANO-FRAMING" target="https://mailarchive.ietf.org/arch/msg/agentproto/ALrRxQEqT6VmBd6jBTuIKETcno8">
+        <front>
+          <title>Re: DRAFT minutes from the AGENTPROTO BoF</title>
+          <author initials="S." surname="Sammartano" fullname="Shawn Sammartano">
+            <organization/>
+          </author>
+          <date year="2026" month="July" day="30"/>
+        </front>
+        <refcontent>message to the agentproto@ietf.org mailing list</refcontent>
+      </reference>
+      <reference anchor="VC-DATA-MODEL" target="https://www.w3.org/TR/2025/REC-vc-data-model-2.0-20250515/">
+        <front>
+          <title>Verifiable Credentials Data Model v2.0</title>
+          <author>
+            <organization>World Wide Web Consortium</organization>
+          </author>
+          <date year="2025" month="May" day="15"/>
+        </front>
+        <refcontent>W3C Recommendation, Section 1.1</refcontent>
+      </reference>
+      <reference anchor="DID-CORE" target="https://www.w3.org/TR/2022/REC-did-core-20220719/">
+        <front>
+          <title>Decentralized Identifiers (DIDs) v1.0</title>
+          <author>
+            <organization>World Wide Web Consortium</organization>
+          </author>
+          <date year="2022" month="July" day="19"/>
+        </front>
+        <refcontent>W3C Recommendation, Sections 9.2 and 9.11</refcontent>
+      </reference>
+      <reference anchor="AP-MORRISON-RULES" target="https://mailarchive.ietf.org/arch/msg/agent2agent/bRdOV5Ou66hFkNd5kt7Wd4KqHAg/">
+        <front>
+          <title>Re: New I-D : A Dimensional Model for Characterizing AI Agent Protocol Proposals and Their Substrates</title>
+          <author initials="B." surname="Morrison" fullname="Blake Morrison">
+            <organization/>
+          </author>
+          <date year="2026" month="September" day="04"/>
+        </front>
+        <refcontent>message to the agent2agent mailing list</refcontent>
+      </reference>
+      <reference anchor="AP-SCHROCK-RETENTION" target="https://mailarchive.ietf.org/arch/msg/agent2agent/kWvHTqephUemSNjbGQWGmoZkYSU/">
+        <front>
+          <title>Re: New I-D : A Dimensional Model for Characterizing AI Agent Protocol Proposals and Their Substrates</title>
+          <author initials="I." surname="Schrock" fullname="Iman Schrock">
+            <organization/>
+          </author>
+          <date year="2026" month="September" day="14"/>
+        </front>
+        <refcontent>message to the agent2agent mailing list</refcontent>
+      </reference>
+      <reference anchor="AP-JIANG-CONTINUITY" target="https://mailarchive.ietf.org/arch/msg/agent2agent/WtvC4rdcZ4dNxjpzIm1FM0y4-0o/">
+        <front>
+          <title>Re: draft-bu-agentproto-security-principal-binding-06 published: focused review request</title>
+          <author initials="Y." surname="Jiang" fullname="Yuning Jiang">
+            <organization/>
+          </author>
+          <date year="2026" month="September" day="15"/>
+        </front>
+        <refcontent>message to the agent2agent mailing list</refcontent>
+      </reference>
+      <reference anchor="WITMODEL" target="https://doi.org/10.5281/zenodo.21970802">
+        <front>
+          <title>Toward a Witnessability Model for AI and Software Execution Systems: A Boundary-Based Framework for Classifying Execution Evidence</title>
+          <author initials="M. A." surname="Sergeev" fullname="Mikhail A. Sergeev">
+            <organization/>
+          </author>
+          <author initials="V." surname="Ikher" fullname="Vladimir Ikher">
+            <organization/>
+          </author>
+          <date year="2026" month="August"/>
+        </front>
+        <refcontent>Version 1.1, bridge revision; also at DOI 10.2139/ssrn.6994720</refcontent>
+      </reference>
+      <reference anchor="WCC-CORE">
+        <front>
+          <title>Witnessability Conceptual Core 1.0</title>
+          <author initials="M. A." surname="Sergeev">
+            <organization/>
+          </author>
+          <date year="2026" month="July"/>
+        </front>
+        <seriesInfo name="DOI" value="10.5281/zenodo.21865251"/>
+      </reference>
+      <reference anchor="HAMILTON" target="https://caselaw.nationalarchives.gov.uk/ewca/crim/2021/577">
+        <front>
+          <title>Hamilton &amp; Ors v Post Office Ltd</title>
+          <author>
+            <organization>Court of Appeal (Criminal Division), England and Wales</organization>
+          </author>
+          <date year="2021" month="April" day="23"/>
+        </front>
+        <refcontent>[2021] EWCA Crim 577, paragraphs 136-137</refcontent>
+      </reference>
+      <reference anchor="GRENFELL2" target="https://assets.publishing.service.gov.uk/media/66d817aa701781e1b341dbd3/CCS0923434692-004_GTI_Phase_2_Volume_1_BOOKMARKED.pdf">
+        <front>
+          <title>Grenfell Tower Inquiry: Phase 2 Report, Volume 1</title>
+          <author>
+            <organization>Grenfell Tower Inquiry</organization>
+          </author>
+          <date year="2024" month="September"/>
+        </front>
+        <refcontent>HC 19-I, Part 1, Chapter 2, paragraphs 2.122-2.123</refcontent>
+      </reference>
+      <reference anchor="EPA-VW" target="https://www.epa.gov/vw/learn-about-volkswagen-violations">
+        <front>
+          <title>Learn About Volkswagen Violations</title>
+          <author>
+            <organization>United States Environmental Protection Agency</organization>
+          </author>
+          <date year="2026" month="June" day="10"/>
+        </front>
+        <refcontent>agency overview of the Clean Air Act violations, including the Notice of Violation of 18 September 2015</refcontent>
+      </reference>
+      <reference anchor="IN-TOTO" target="https://www.usenix.org/system/files/sec19-torres-arias.pdf">
+        <front>
+          <title>in-toto: Providing farm-to-table guarantees for bits and bytes</title>
+          <author initials="S." surname="Torres-Arias" fullname="Santiago Torres-Arias">
+            <organization/>
+          </author>
+          <author initials="H." surname="Afzali" fullname="Hammad Afzali">
+            <organization/>
+          </author>
+          <author initials="T. K." surname="Kuppusamy" fullname="Trishank Karthik Kuppusamy">
+            <organization/>
+          </author>
+          <author initials="R." surname="Curtmola" fullname="Reza Curtmola">
+            <organization/>
+          </author>
+          <author initials="J." surname="Cappos" fullname="Justin Cappos">
+            <organization/>
+          </author>
+          <date year="2019" month="August"/>
+        </front>
+        <refcontent>28th USENIX Security Symposium</refcontent>
+      </reference>
+      <reference anchor="PROV-DM" target="https://www.w3.org/TR/prov-dm/">
+        <front>
+          <title>PROV-DM: The PROV Data Model, W3C Recommendation</title>
+          <author>
+            <organization>World Wide Web Consortium</organization>
+          </author>
+          <date year="2013" month="April"/>
+        </front>
+      </reference>
+      <reference anchor="DURANTI1998">
+        <front>
+          <title>Diplomatics: New Uses for an Old Science</title>
+          <author initials="L." surname="Duranti" fullname="Luciana Duranti">
+            <organization/>
+          </author>
+          <date year="1998"/>
+        </front>
+        <refcontent>Scarecrow Press</refcontent>
+      </reference>
+      <reference anchor="INTERPARES" target="https://www.interpares.org/book/index.cfm">
+        <front>
+          <title>The Long-term Preservation of Authentic Electronic Records: Findings of the InterPARES Project</title>
+          <author initials="L." surname="Duranti" fullname="Luciana Duranti" role="editor">
+            <organization/>
+          </author>
+          <date year="2005"/>
+        </front>
+      </reference>
+      <reference anchor="ISO14721">
+        <front>
+          <title>Space Data System Practices -- Reference model for an open archival information system (OAIS)</title>
+          <author>
+            <organization>International Organization for Standardization</organization>
+          </author>
+          <date year="2025" month="March"/>
+        </front>
+        <seriesInfo name="ISO" value="14721:2025, Edition 3"/>
+        <refcontent>also issued as CCSDS 650.0-M-3, December 2024</refcontent>
+      </reference>
+      <reference anchor="ISO16363">
+        <front>
+          <title>Space data and information transfer systems -- Audit and certification of trustworthy digital repositories</title>
+          <author>
+            <organization>International Organization for Standardization</organization>
+          </author>
+          <date year="2025" month="March"/>
+        </front>
+        <seriesInfo name="ISO" value="16363:2025, Edition 2"/>
+      </reference>
+      <reference anchor="CCSDS652-1" target="https://ccsds.org/Pubs/652x1m3.pdf">
+        <front>
+          <title>Requirements for Bodies Providing Audit and Certification of Candidate Trustworthy Digital Repositories</title>
+          <author>
+            <organization>Consultative Committee for Space Data Systems</organization>
+          </author>
+          <date year="2024" month="December"/>
+        </front>
+        <seriesInfo name="CCSDS" value="652.1-M-3, Issue 3"/>
+      </reference>
+      <reference anchor="ISO15026-2">
+        <front>
+          <title>Systems and software engineering -- Systems and software assurance -- Part 2: Assurance case</title>
+          <author>
+            <organization>ISO/IEC/IEEE</organization>
+          </author>
+          <date year="2022"/>
+        </front>
+        <seriesInfo name="ISO/IEC/IEEE" value="15026-2:2022"/>
+      </reference>
+      <reference anchor="GSN" target="https://scsc.uk/scsc-141c">
+        <front>
+          <title>Goal Structuring Notation Community Standard, Version 3</title>
+          <author>
+            <organization>SCSC Assurance Case Working Group</organization>
+          </author>
+          <date year="2021"/>
+        </front>
+        <seriesInfo name="SCSC" value="141C"/>
+      </reference>
+      <reference anchor="FRE902" target="https://www.govinfo.gov/content/pkg/USCODE-2024-title28/html/USCODE-2024-title28-app-federalru-dup2-rule902.htm">
+        <front>
+          <title>Federal Rules of Evidence, Rule 902(13) and Rule 902(14), with Advisory Committee Notes</title>
+          <author>
+            <organization>United States</organization>
+          </author>
+          <date year="2017" month="December"/>
+        </front>
+        <refcontent>Amendments effective 1 December 2017; text in the 2024 edition of the United States Code.</refcontent>
+      </reference>
+    </references>
+    
+
+<section anchor="abc">
+      <name>The (a,b,c) scenario worked through</name>
+      <t>In the agentproto mailing-list discussion of July 2026, in the thread on
+the draft minutes of the AGENTPROTO BoF, Stephen Farrell posed a gating
+scenario <xref target="AP-FARRELL-ABC"/>. In his words:</t>
+      <ul empty="true">
+        <li>
+          <t>If (a,b,c) is a comms path between agents (perhaps within a tree) and
+if 'c' is actually a newly created entity, but one that needs access
+to a long-term secret credential accessible at 'a' (e.g. pwd or SSH
+private key) and where that credential must not be exposed to 'b' nor
+easily abused - then how's that going to work?</t>
+        </li>
+      </ul>
+      <t>He emphasized that "the scenario I posited is one where 'b' creates 'c'
+and so is in a fine place to cheat" <xref target="AP-FARRELL-CHEAT"/>.</t>
+      <t>The list discussion produced concrete mitigations, collected in a reply
+by Shawn Sammartano <xref target="AP-SAMMARTANO"/>, who credited most of them to
+existing mechanisms:</t>
+      <ul spacing="normal">
+        <li>
+          <t>exact, single-use, attenuated permission slips bound to request bytes;</t>
+        </li>
+        <li>
+          <t>hardware-protected keys, and threshold signing;</t>
+        </li>
+        <li>
+          <t>short-lived credentials, and forward-moving counters;</t>
+        </li>
+        <li>
+          <t>delegation budgets, and delays with cancellation windows;</t>
+        </li>
+        <li>
+          <t>approval separated from the creator. Sammartano also stated the hard
+case plainly: "If b builds c, then b can read c's key, so b can be c.
+No message format fixes that, mine included."</t>
+        </li>
+      </ul>
+      <t>The author proposed an enforcement/observation framing in response to
+that discussion <xref target="AP-SERGEEV-GATE"/>. The control-topology test of
+<xref target="topology"/> refines that framing by distinguishing adversary-resistant
+detection coverage from a particular finding made from evidence already
+obtained. Farrell posed the scenario. This document does not attribute
+the generalized test to him. Applied to the scenario:</t>
+      <ul spacing="normal">
+        <li>
+          <t>Exact, single-use, attenuated authority bounds what the grant
+authorizes, where it is enforced. It does not establish that an action
+attributed to c was not performed by b, where b created or hosts c and
+can obtain or invoke c's signing capability (rules 2 and 6 of
+<xref target="noninference"/>).</t>
+        </li>
+        <li>
+          <t>A message format can carry the relevant control or evidence. It cannot
+create the required independence (Sections <xref target="principle" format="counter"/> and
+<xref target="independence" format="counter"/>).</t>
+        </li>
+        <li>
+          <t>A prevention claim at that boundary needs an enforcement point b does
+not control and cannot circumvent. A claim that covered misbehavior
+cannot be concealed needs evidence b cannot forge, on a path b cannot
+silently prune (<xref target="topology"/>). Attestation and threshold signing
+supply such points only in deployments that actually place them
+outside b's control.</t>
+        </li>
+        <li>
+          <t>What is missing in the hard case is not another field. It is a point
+outside b's control that either enforces or observes, and no message
+format creates one.</t>
+        </li>
+      </ul>
+      <t>This is narrower than solving credential custody. It makes the assurance
+claim and its trust boundary reviewable before a mechanism is chosen,
+which is what a chartering or design review needs.</t>
+    </section>
+    <section anchor="findings">
+      <name>Three public findings</name>
+      <t>Three public findings state the same bounds outside agent systems, in
+the words of the bodies that made them.</t>
+      <t>In the English prosecutions arising from the Post Office Horizon
+accounting system, the Court of Appeal found that the prosecutor
+"treated what was no more than a shortfall shown by an unreliable
+accounting system as an incontrovertible loss", and that defendants were
+convicted "on the basis that the Horizon data must be correct, and cash
+must therefore be missing, when in fact there could be no confidence as
+to that foundation" <xref target="HAMILTON"/>. The load-bearing premise was the
+reliability of that system. The court recorded that the prosecutor was
+under a duty to investigate subpostmasters' claims that there were
+problems with it, and it found "failures of investigation and
+disclosure". On the reading taken here, that is the position rule 9 of
+<xref target="noninference"/> names. The claim rested on a premise the relying party
+was required to test and did not adequately test. The judgment does not
+address what a bounded report of the same evidence would have said, and
+it is not cited for that part of the rule.</t>
+      <t>In the inquiry into the Grenfell Tower fire, the panel examined the
+performance criteria applied in large-scale fire tests of external wall
+systems. Failure to meet those criteria would show a system unlikely to
+comply with the applicable requirement. But "the converse was not
+necessarily true": a system might meet the criteria and yet fail to
+comply with that requirement <xref target="GRENFELL2"/>. A bounded test result can
+tell against a claim in one direction without establishing it in the
+other.</t>
+      <t>In the third case the test results were genuine outputs of a genuine
+test. Vehicles were certified against emissions standards on the
+strength of those results <xref target="EPA-VW-NOV"/>. Software detected the test
+condition and enabled full emissions controls only then, so the vehicles
+"meet emissions standards in the laboratory or testing station, but
+during normal operation" emitted nitrogen oxides at levels up to forty
+times the standard <xref target="EPA-VW"/>. The result established the behavior of
+the vehicle under the conditions the test applied, which was all it had
+ever observed. The certificate carried it to a claim about the vehicle
+in use (rule 11 of <xref target="noninference"/>).</t>
+      <t>These authorities reached findings within their own legal and regulatory
+settings. The findings are their own, and their connection to the rules
+stated here is this document's reading.</t>
+    </section>
+    <section anchor="changes">
+      <name>Changes</name>
+      <t>This appendix is to be removed before publication as an RFC.</t>
+      <section anchor="changes-02">
+        <name>Changes from -01 to -02</name>
+        <ul>
+          <li>
+            <t><xref target="topology"/> adds a Certificate Transparency example that distinguishes a signed incorporation promise, evidence of inclusion, consistency of the checked log states, detection coverage, and a particular detection. The example states its client-policy and control assumptions.</t>
+          </li>
+          <li>
+            <t><xref target="reporting"/> distinguishes an accurate authorization-status report from the grounds that the reported result was available to or used by the decision-maker considering whether an activity may continue. It makes the reference time for current status part of the appraisal context, covers consultations that return no current answer, and leaves admission policy separate.</t>
+          </li>
+          <li>
+            <t><xref target="RFC6962"/> is added alongside the existing <xref target="RFC9162"/> reference. The Acknowledgments credit Blake Morrison's contributed CT example. The development disclosure distinguishes work on -01 from the additions in this revision.</t>
+          </li>
+          <li>
+            <t>The evidence-law example makes the conditions and limits of self-authentication explicit. The InterPARES reference identifies its editor, the Rule 902 reference distinguishes amendment and compilation dates, and the Bu and Abak references cite updated revisions. Small wording changes clarify terminology and non-inference rules 2 and 12; CT and CA are expanded at first use.</t>
+          </li>
+          <li>
+            <t>No protocol, record format, registry, result-code set, or new numbered non-inference rule is introduced.</t>
+          </li>
+        </ul>
+      </section>
+      <section anchor="changes-01">
+        <name>Changes from -00 to -01</name>
+        <ul spacing="normal">
+          <li>
+            <t>Independence is defined once, as limits on three capabilities of a
+named party or coalition: forgery, concealment, and circumvention
+(Sections <xref target="terminology" format="counter"/> and <xref target="independence" format="counter"/>). The earlier
+definition treated them as one property. <xref target="ceiling"/> no longer repeats
+the audit example, which stays in <xref target="topology"/>.</t>
+          </li>
+          <li>
+            <t><xref target="terminology"/> adds a note on the RATS terms.</t>
+          </li>
+          <li>
+            <t><xref target="principle"/> says in which sense this document uses "support", adds a
+practical test of it, and points to the routes of <xref target="constructive"/>.
+Its first bound and the abstract now name what evidence constitutes or
+proves, not only what it observed.</t>
+          </li>
+          <li>
+            <t><xref target="bases"/> no longer describes the bases as ordered. They are distinct
+questions about one action. It now points to <xref target="constructive"/> for
+claims about an effect, and it separates the observation base from an
+observation in the sense used elsewhere in the document.</t>
+          </li>
+          <li>
+            <t><xref target="ceiling"/> speaks of kinds of claim rather than claim dimensions.</t>
+          </li>
+          <li>
+            <t><xref target="noninference"/> adds rules 11 to 13: behavior observed under
+different conditions, multiplicity of sources, and the coherence of an
+account produced by the interested party. Rules 1 to 10 keep their
+numbers. Rule 2 adds attribution along a delivery path. Rule 3 no
+longer reads matching records as agreement between the parties. Rule 4
+limits itself to the authenticity of individual records, and rule 7 to
+the boundary's own observation. The last sentence of rule 9 now
+follows the reporting terms of <xref target="reporting"/>. The preamble is shorter.</t>
+          </li>
+          <li>
+            <t><xref target="lens"/> revises four items: item 3 names the three capabilities, item
+5 no longer says that a signature or registration supplies no
+evidence, item 7 asks which route of <xref target="constructive"/>, or which other
+stated basis, supports a claimed effect, and item 10 follows
+<xref target="reporting"/>.</t>
+          </li>
+          <li>
+            <t><xref target="constructive"/> adds a route through evidence whose verification
+establishes a predicate. It adds a qualification on the time and
+finality of an observed effect, and it names as an idealization the
+treatment of probabilistic soundness as exact. The closing advice on
+deployment design is removed, because <xref target="scope-and-non-goals"/> puts
+evidence design out of scope.</t>
+          </li>
+          <li>
+            <t><xref target="payment"/> ends with a sample report.</t>
+          </li>
+          <li>
+            <t><xref target="reporting"/> separates whether an evaluation was made from what it
+found, and notes the related line drawn earlier in
+<xref target="I-D.schrock-ep-outcome-binding"/>. The status that -00 called "not
+established" is now "not evaluated", because the rules use "establish"
+for the relation between evidence and a claim. Downgrading is now a
+reporting practice that applies to both questions, and a claim
+supported at another base is a separate finding, not a downgrade.</t>
+          </li>
+          <li>
+            <t>Sections <xref target="applicability" format="counter"/> and <xref target="related" format="counter"/> are shorter. The three
+public findings move to <xref target="findings"/>; the Grenfell summary now follows
+the inquiry's wording, and the emissions summary also cites the Notice
+of Violation <xref target="EPA-VW-NOV"/>. The paragraph on archival preservation
+moves from <xref target="related"/> to <xref target="applicability"/>. The discussion of Federal
+Rule of Civil Procedure 37(e) and the separate paragraph on the
+considerations-section genre are removed. <xref target="lens"/> still names that
+genre.</t>
+          </li>
+          <li>
+            <t><xref target="related"/> corrects the paraphrase of requirement DET-3: -00 omitted
+the qualifier that limits the cooperation clause to participants whose
+conduct or assertion is material. The paraphrase now follows the
+published wording of
+<xref target="I-D.wadkins-agentproto-action-determinability"/>.</t>
+          </li>
+          <li>
+            <t><xref target="related"/> now lists all five distinctions drawn in
+<xref target="I-D.abak-agent-control-delivery-evidence"/>; -00 omitted
+required-target resolution. It also cites sources for the
+reference-monitor and tamper-evident logging lineages <xref target="ANDERSON72"/>
+              <xref target="SCHNEIER-KELSEY"/>.</t>
+          </li>
+          <li>
+            <t><xref target="security"/> narrows its opening sentence, and adds that every finding
+is conditional on the correctness of the evaluator. The item on
+unobservable topology now refers to <xref target="reporting"/> for the reporting
+terms.</t>
+          </li>
+          <li>
+            <t>The abstract no longer names the source of the scenario. <xref target="topology"/>,
+<xref target="abc"/>, and the Acknowledgments do.</t>
+          </li>
+        </ul>
+      </section>
+    </section>
+    <section numbered="false" anchor="acknowledgments">
+      <name>Acknowledgments</name>
+      <t>The scenario of <xref target="abc"/> was posed by Stephen Farrell <xref target="AP-FARRELL-ABC"/>.
+The mitigation list and the plain statement of the key-custody limit
+were collected by Shawn Sammartano <xref target="AP-SAMMARTANO"/>, who also confirmed
+the enforcement/observation framing used here <xref target="AP-SAMMARTANO-FRAMING"/>;
+Charles Eckel proposed that 'a' authorize 'c' to do something specific
+on 'a's behalf, rather than expose a long-term credential <xref target="AP-ECKEL"/>.
+Dapeng Liu proposed sender-constrained tokens (DPoP) so that 'b' could
+not present a token bound to 'c's key <xref target="AP-LIU-DPOP"/>; <xref target="topology"/>
+discusses what they do and do not prevent. Yuning Jiang raised the
+continuity of an identity across restarts, instance changes, and key
+rotation, which is how the question behind rule 10 of <xref target="noninference"/>
+entered this work <xref target="AP-JIANG-CONTINUITY"/>. The distinction itself is
+older and is drawn in <xref target="DID-CORE"/>. Vladimir Ikher is the author's
+co-author on the earlier work <xref target="WITMODEL"/> from which the bases of
+<xref target="bases"/> and the ceiling of <xref target="ceiling"/> are restated here. This
+document also benefited from the broader agentproto and agent2agent
+mailing-list discussions of 2026 on evidence, delegation, and audit. The
+author thanks their participants without implying that any of them
+endorses this document.</t>
+      <t>Douglas Wadkins reviewed a pre-submission draft; the statement of scope
+in <xref target="scope-and-non-goals"/>, the additions to <xref target="reporting"/>, and the
+qualification in <xref target="applicability"/> are responses to his comments.</t>
+      <t>Blake Morrison contributed the Certificate Transparency omission-control example in <xref target="topology"/>.</t>
+    </section>
+    <section numbered="false" anchor="document-development-disclosure">
+      <name>Document development disclosure</name>
+      <t>This document was drafted with substantial assistance from generative AI
+tools, working from the author's prior publications, specifications, and
+mailing-list correspondence, at the author's direction. It also
+incorporates material arising from adversarial review conducted with
+such tools: the wording of several rules, and the separation of
+analytical justification from documented practical confirmation stated
+in <xref target="noninference"/>, were reached that way. In -01, the
+treatment of independence (Sections <xref target="terminology" format="counter"/>, <xref target="principle" format="counter"/>,
+<xref target="independence" format="counter"/>, and <xref target="constructive" format="counter"/>), rules 12 and 13 of
+<xref target="noninference"/>, and the reporting terms of <xref target="reporting"/> were revised
+or added the same way. In this revision, the Certificate Transparency
+example in <xref target="topology"/> was edited from Blake Morrison's
+contribution with assistance from such tools. The authorization-status
+clarification in <xref target="reporting"/> was also developed with such
+assistance. The author is responsible for this document's content,
+citations, and attributions. The use of
+large language models (LLMs) in IETF discussions is the subject of
+<xref target="I-D.fengfar-led"/>, which explicitly excludes Internet-Draft and RFC
+text from its scope. This disclosure is voluntary.</t>
+      <t>The author also has an implementation interest in this area: the WEXP
+appraisal layer <xref target="I-D.sergeev-wexp-core"/> is the author's own work. This
+document is usable independently of it. No organizational independence
+between the two works is claimed.</t>
+    </section>
+  </back>
+</rfc>
