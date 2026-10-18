@@ -53,3 +53,9 @@ example needs sensitive material to make its point, discuss a safe way to
 present it with the editor first. Follow the participation guidance linked
 from the IETF Note Well.
 
+
+## External reports and dispositions
+
+See [ISSUE-PROCESS.md](ISSUE-PROCESS.md) for response targets, review,
+public dispositions, closure, and the distinction between working changes
+and a posted I-D. Questions by issue or email are welcome without a patch.

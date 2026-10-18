@@ -139,3 +139,9 @@ The public Git history starts with -02 and the contribution process; older
 publications are imported as frozen artifacts. Private Git history and
 correspondence are not imported. See [LICENSE.md](LICENSE.md) for the document
 notices and the separate tooling license.
+
+## External feedback
+
+[ISSUE-PROCESS.md](ISSUE-PROCESS.md) describes how reports receive a public
+disposition, how changes are checked, and when an issue can be closed.
+Questions and counterexamples are welcome; a patch is not required.

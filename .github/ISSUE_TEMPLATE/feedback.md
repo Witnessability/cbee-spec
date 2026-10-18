@@ -17,4 +17,6 @@ Describe what the evidence establishes and any additional assumption needed.
 Public references or a small counterexample are welcome.
 
 Please keep private correspondence and sensitive evidence out of this issue.
-See CONTRIBUTING.md for contribution guidance; email feedback is equally welcome.
+A question is enough; no patch or implementation is required.
+See CONTRIBUTING.md and ISSUE-PROCESS.md for contribution guidance and review.
+Email feedback is equally welcome.
