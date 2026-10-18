@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Published document and author contact
+    url: https://datatracker.ietf.org/doc/draft-sergeev-claim-boundaries/
+    about: Read the official document and find the author's contact details; email feedback is welcome.
