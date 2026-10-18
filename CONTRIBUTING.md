@@ -13,9 +13,15 @@ assess the proposal. You do not need an implementation or a patch to contribute.
 
 For manuscript edits, change only `draft-sergeev-claim-boundaries.xml` and keep
 the pull request focused on one issue. Describe the reason for the change and
-the checks performed, including formatter version and command if you rendered
-the manuscript. Keep the frozen `published/02/` files unchanged. Working
-renderings are review aids, rather than additional editable manuscript sources.
+the checks performed. Run `make review`, `make check`, `make test`, and,
+with the formatter installed, `make build`. Include the regenerated
+`review/editor-copy.md` in the PR; do not hand-edit it or the TXT/HTML outputs.
+Keep every frozen `published/NN/` XML/TXT and checksum file unchanged.
+Working renderings are review aids, rather than additional editable sources.
+
+Use a short-lived topic branch for a focused change. After review and successful
+checks, merge it into `main` and remove the merged branch. Published revisions
+use immutable tags and archive directories, not long-lived release branches.
 
 The editor records dispositions and retains material disagreement. A merge
 does not establish IETF consensus, implementation behavior, or permission to
@@ -30,7 +36,8 @@ the [IETF Note Well](https://www.ietf.org/about/note-well/),
 [BCP 79](https://www.rfc-editor.org/info/bcp79), and the
 [IETF Trust Legal Provisions](https://trustee.ietf.org/license-info).
 Contribute material you are entitled to provide under those terms.
-The manuscript retains its document notices; see [LICENSE.md](LICENSE.md).
+The manuscript retains its document notices; [LICENSE.md](LICENSE.md) also
+identifies the separate BSD 3-Clause license for repository tooling.
 There is no additional repository CLA or signed editorial form.
 
 ## Attribution and privacy
@@ -45,3 +52,4 @@ of issues and pull requests unless disclosure has been authorized. If an
 example needs sensitive material to make its point, discuss a safe way to
 present it with the editor first. Follow the participation guidance linked
 from the IETF Note Well.
+

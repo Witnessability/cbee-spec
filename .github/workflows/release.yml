@@ -1,0 +1,57 @@
+name: Release a published IETF revision
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: 'Already published I-D revision (two digits, e.g. 00)'
+        required: true
+        default: '02'
+        type: string
+      target_commit:
+        description: 'Full main-history commit SHA containing the exact published/NN archive'
+        required: true
+        type: string
+      notes:
+        description: 'Optional short summary of this revision'
+        required: false
+        default: ''
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: ietf-release-${{ inputs.revision }}
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.repository == 'Witnessability/cbee-spec' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Check the source and regression tests
+        run: make check test
+      - name: Verify the IETF archive, publish the GitHub release, and read back assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVISION: ${{ inputs.revision }}
+          TARGET_COMMIT: ${{ inputs.target_commit }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          python tools/release.py --revision="$REVISION" --commit="$TARGET_COMMIT" --notes="$NOTES" --publish
+      - name: Preserve verification results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/release/
+          if-no-files-found: warn
+          retention-days: 14
+

@@ -1,0 +1,41 @@
+name: Build and check draft
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: draft-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    name: Source checks and RFCXML build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install pinned formatter and record the environment
+        run: |
+          mkdir -p build
+          python -m pip install -r requirements.txt
+          python -m pip freeze > build/environment.txt
+      - name: Check source, frozen publication, and editorial tools
+        run: make check test
+      - name: Render with official xml2rfc and repeat in the same environment
+        run: make build
+      - name: Preserve public renderings and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: editor-build-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/
+          if-no-files-found: error
+          retention-days: 14
+
