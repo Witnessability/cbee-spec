@@ -1,0 +1,71 @@
+{
+  "document": "draft-sergeev-claim-boundaries",
+  "latest_published_revision": "02",
+  "authority": "IETF archive",
+  "history_source": "https://datatracker.ietf.org/api/v1/doc/docevent/?doc__name=draft-sergeev-claim-boundaries&type=new_revision&limit=100&format=json",
+  "revisions": [
+    {
+      "revision": "00",
+      "ietf_posted_at": "2026-09-16T23:37:06Z",
+      "document_date": "17 September 2026",
+      "datatracker": "https://datatracker.ietf.org/doc/draft-sergeev-claim-boundaries/00/",
+      "summary": "Initial individual Internet-Draft: the bounding principle, claim ceilings, non-inference rules, a control-topology test, and worked examples.",
+      "files": [
+        {
+          "name": "draft-sergeev-claim-boundaries-00.xml",
+          "bytes": 151463,
+          "sha256": "640d2f2804cd2d7aeb495ed1294a03908906aa10b6e8bfd1d848b73e97ee5076",
+          "url": "https://www.ietf.org/archive/id/draft-sergeev-claim-boundaries-00.xml"
+        },
+        {
+          "name": "draft-sergeev-claim-boundaries-00.txt",
+          "bytes": 97001,
+          "sha256": "6167510091e13a39e8f3116091f5207d69b0da6a7bd0b550e0372b68c8a88b59",
+          "url": "https://www.ietf.org/archive/id/draft-sergeev-claim-boundaries-00.txt"
+        }
+      ]
+    },
+    {
+      "revision": "01",
+      "ietf_posted_at": "2026-09-23T04:00:40Z",
+      "document_date": "23 September 2026",
+      "datatracker": "https://datatracker.ietf.org/doc/draft-sergeev-claim-boundaries/01/",
+      "summary": "Clarifies independence as limits on forgery, concealment, and circumvention; defines support and separates evidence bases; adds non-inference rules 11\u201313 and revises reporting distinctions. See the published Changes from -00 appendix.",
+      "files": [
+        {
+          "name": "draft-sergeev-claim-boundaries-01.xml",
+          "bytes": 122449,
+          "sha256": "d59d0e4a85bff662a8f13c34cb1eb1297f2140a62a130ddd2fdedbbdcece0829",
+          "url": "https://www.ietf.org/archive/id/draft-sergeev-claim-boundaries-01.xml"
+        },
+        {
+          "name": "draft-sergeev-claim-boundaries-01.txt",
+          "bytes": 111543,
+          "sha256": "0d90638366325bbacb368e9d1fd256f7a6117831ff31e10cb49d1b40e8446d35",
+          "url": "https://www.ietf.org/archive/id/draft-sergeev-claim-boundaries-01.txt"
+        }
+      ]
+    },
+    {
+      "revision": "02",
+      "ietf_posted_at": "2026-10-15T22:59:21Z",
+      "document_date": "15 October 2026",
+      "datatracker": "https://datatracker.ietf.org/doc/draft-sergeev-claim-boundaries/02/",
+      "summary": "Adds the Certificate Transparency example and distinguishes an authorization-status report from evidence that its result was available to or used by a decision-maker. Clarifies reference time and consultations without a current answer, plus references and acknowledgments. See the published Changes from -01 to -02 appendix.",
+      "files": [
+        {
+          "name": "draft-sergeev-claim-boundaries-02.xml",
+          "bytes": 137287,
+          "sha256": "d6d01ebc5d446991a2a4e65497171adaf4b37637d9bd36c5c017be6490b622b7",
+          "url": "https://www.ietf.org/archive/id/draft-sergeev-claim-boundaries-02.xml"
+        },
+        {
+          "name": "draft-sergeev-claim-boundaries-02.txt",
+          "bytes": 117649,
+          "sha256": "67d93ac09bd572bb01b5e00c3101daa6ee3a2217f5e23d2bb02658d6a731ccc0",
+          "url": "https://www.ietf.org/archive/id/draft-sergeev-claim-boundaries-02.txt"
+        }
+      ]
+    }
+  ]
+}

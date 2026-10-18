@@ -1,0 +1,12 @@
+* text=auto eol=lf
+# Preserve official archive bytes on every platform.
+published/**/*.xml -text
+published/**/*.txt -text
+
+# Count the actual RFCXML manuscript as a source, not only the build tooling.
+/draft-sergeev-claim-boundaries.xml linguist-detectable=true
+# Do not count the frozen duplicate publication as another source language.
+published/** linguist-documentation=true
+# Generated from the XML; keep its diff collapsed unless a reviewer expands it.
+review/editor-copy.md linguist-generated=true
+
